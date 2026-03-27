@@ -400,8 +400,12 @@ function TopBar({ sessions, streak }) {
 
   return (
     <div style={{ marginBottom: 20 }}>
-      {/* Top row: all pills stretch to fill full width */}
-      <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 16 }}>
+      {/* Top row: full viewport width */}
+      <div style={{
+        display: "flex", gap: 8, alignItems: "center", marginBottom: 16,
+        width: "100vw", marginLeft: "calc(-50vw + 50%)", paddingLeft: 20, paddingRight: 20,
+        boxSizing: "border-box"
+      }}>
         <div style={{ ...pillStyle, flex: 1, justifyContent: "center" }}><span>⚡</span><span>{formatHM(maxMins)}</span><span style={labelStyle}>max</span></div>
         <div style={{ ...pillStyle, flex: 1, justifyContent: "center" }}><span>📊</span><span>{formatHM(monthMins)}</span><span style={labelStyle}>{monthName}</span></div>
         <div style={{ ...pillStyle, flex: 1, justifyContent: "center" }}><span>📅</span><span>{formatHM(yearMins)}</span><span style={labelStyle}>{yearStr}</span></div>
