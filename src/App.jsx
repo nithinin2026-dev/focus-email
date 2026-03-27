@@ -338,13 +338,13 @@ function TopBar({ sessions }) {
   const weekTotal = weekDays.reduce((a, d) => a + (dayTotals[d] || 0), 0);
 
   const fixedPill = {
-    display: "flex", alignItems: "center", gap: 6,
+    display: "flex", alignItems: "center", gap: 7,
     background: "#000", color: "#fff",
-    padding: "7px 14px", borderRadius: 40,
-    fontFamily: font, fontSize: 13, fontWeight: 700,
-    letterSpacing: "0.02em", boxShadow: "0 2px 10px rgba(0,0,0,0.15)"
+    padding: "10px 18px", borderRadius: 40,
+    fontFamily: font, fontSize: 15, fontWeight: 700,
+    letterSpacing: "0.02em", boxShadow: "0 2px 12px rgba(0,0,0,0.18)"
   };
-  const lblStyle = { fontWeight: 400, fontSize: 10, opacity: 0.6 };
+  const lblStyle = { fontWeight: 400, fontSize: 12, opacity: 0.6 };
   const inlinePill = {
     display: "inline-flex", alignItems: "center", gap: 7,
     background: "#000", color: "#fff",
