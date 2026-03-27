@@ -76,7 +76,6 @@ async function upsertReflection(date, note, hrsOverride) {
   const { error } = await supabase.from("reflections").upsert({ user_id: user.id, date, note, hrs_override: hrsOverride }, { onConflict: "user_id,date" });
   if (error) console.error("Upsert reflection error:", error);
 }
-// Tasks
 async function loadTasks() {
   const { data, error } = await supabase.from("tasks").select("*").order("created_at", { ascending: true });
   if (error) { console.error("Load tasks error:", error); return []; }
@@ -98,7 +97,6 @@ async function deleteTask(taskId) {
   const { error } = await supabase.from("tasks").delete().eq("id", taskId);
   if (error) console.error("Delete task error:", error);
 }
-// Sleep
 async function loadSleepLogs() {
   const { data, error } = await supabase.from("sleep_logs").select("*").order("date", { ascending: false });
   if (error) { console.error("Load sleep error:", error); return []; }
@@ -146,14 +144,11 @@ function getDayTotals(sessions) {
   sessions.forEach(s => { t[s.date] = (t[s.date] || 0) + s.duration; });
   return t;
 }
-function isPastDate(dateStr) {
-  return dateStr < todayStr();
-}
-// Green gradient: 2h=light green, 6h+=darkest green
+function isPastDate(dateStr) { return dateStr < todayStr(); }
 function getGreenForMins(mins) {
   if (mins < 120) return "#E63946";
   const hrs = mins / 60;
-  const t = Math.min((hrs - 2) / 4, 1); // 2h→0, 6h→1
+  const t = Math.min((hrs - 2) / 4, 1);
   const r = Math.round(42 - t * 30);
   const g = Math.round(157 + t * 40);
   const b = Math.round(143 - t * 80);
@@ -165,17 +160,97 @@ function getBarGradient(mins) {
   return `linear-gradient(180deg, ${c}, ${c}88)`;
 }
 
-// ─── Countdown Banner (today hours | midnight | target date) ───
-function CountdownBanner({ sessions }) {
-  const [now, setNow] = useState(new Date());
-  const [targetDate, setTargetDate] = useState(() => localStorage.getItem("sl_targetDate") || "");
-  const [editingTarget, setEditingTarget] = useState(false);
-  const [tempTarget, setTempTarget] = useState("");
-  useEffect(() => { const t = setInterval(() => setNow(new Date()), 60000); return () => clearInterval(t); }, []);
+// ═══════════════════════════════════════════
+// ─── TOP NAVBAR — hides on scroll down, shows on scroll up ───
+// ═══════════════════════════════════════════
+function TopNavBar({ sessions, streak, todayMins, onMenuClick }) {
+  const [visible, setVisible] = useState(true);
+  const lastScrollY = useRef(0);
   const font = "'Nunito', sans-serif";
 
-  // Today's hours
-  const todayMins = sessions.filter(s => s.date === todayStr()).reduce((a, s) => a + s.duration, 0);
+  useEffect(() => {
+    const handleScroll = () => {
+      const currentY = window.scrollY;
+      if (currentY > lastScrollY.current && currentY > 60) setVisible(false);
+      else setVisible(true);
+      lastScrollY.current = currentY;
+    };
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  const [quoteIdx, setQuoteIdx] = useState(() => Math.floor(Math.random() * QUOTES.length));
+  useEffect(() => {
+    const t = setInterval(() => setQuoteIdx(p => (p + 1) % QUOTES.length), 180000);
+    return () => clearInterval(t);
+  }, []);
+
+  const dayTotals = getDayTotals(sessions);
+  const maxMins = Object.values(dayTotals).length > 0 ? Math.max(...Object.values(dayTotals)) : 0;
+  const hitTarget = todayMins >= 120;
+
+  return (
+    <div style={{
+      position: "fixed", top: 0, left: 0, right: 0, zIndex: 1000,
+      background: "#fff", borderBottom: "1px solid #eee",
+      transform: visible ? "translateY(0)" : "translateY(-100%)",
+      transition: "transform 0.35s ease",
+      padding: "10px 16px",
+      display: "flex", alignItems: "center", justifyContent: "space-between",
+      fontFamily: font,
+      boxShadow: visible ? "0 2px 12px rgba(0,0,0,0.06)" : "none"
+    }}>
+      {/* Left: hamburger + max hours */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <button onClick={onMenuClick} style={{ border: "none", background: "none", cursor: "pointer", padding: 4, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#000" strokeWidth="2.5" strokeLinecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
+        <span style={{ fontSize: 13, fontWeight: 700, display: "flex", alignItems: "center", gap: 5 }}>
+          <span>⚡</span><span>{formatHM(maxMins)}</span>
+          <span style={{ fontWeight: 400, fontSize: 10, color: "#999" }}>max</span>
+        </span>
+      </div>
+
+      {/* Center: quote */}
+      <div style={{ flex: 1, textAlign: "center", fontSize: 11, fontWeight: 600, color: "#888", fontStyle: "italic", padding: "0 12px", overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>
+        "{QUOTES[quoteIdx]}"
+      </div>
+
+      {/* Right: streak */}
+      <div style={{
+        display: "flex", alignItems: "center", gap: 5,
+        background: hitTarget ? (streak > 0 ? "#000" : "#e0e0e0") : "#E63946",
+        color: hitTarget ? (streak > 0 ? "#fff" : "#999") : "#fff",
+        padding: "6px 14px", borderRadius: 30,
+        fontSize: 13, fontWeight: 700
+      }}>
+        <span style={{ fontSize: 16 }}>{hitTarget ? (streak > 0 ? "🔥" : "○") : "⚠️"}</span>
+        <span>{streak}</span>
+        <span style={{ fontWeight: 400, fontSize: 10, opacity: 0.8 }}>
+          {hitTarget ? (streak === 1 ? "day" : "days") : "do 2h+"}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════
+// ─── WEEK BAR + TODAY/TIMER/COUNTDOWN ───
+// ═══════════════════════════════════════════
+function WeekStrip({ sessions }) {
+  const font = "'Nunito', sans-serif";
+  const dayTotals = getDayTotals(sessions);
+  const now = new Date();
+  const todayKey = todayStr();
+  const dayOfWeek = now.getDay();
+  const mon = new Date(now); mon.setDate(now.getDate() - ((dayOfWeek + 6) % 7));
+  const weekDays = [];
+  for (let i = 0; i < 7; i++) { const dd = new Date(mon); dd.setDate(mon.getDate() + i); weekDays.push(dd.toISOString().slice(0, 10)); }
+  const dayLabels = ["M", "T", "W", "TH", "F", "SA", "SU"];
+  const weekTotal = weekDays.reduce((a, d) => a + (dayTotals[d] || 0), 0);
+
+  // Today stats
+  const todayMins = sessions.filter(s => s.date === todayKey).reduce((a, s) => a + s.duration, 0);
   const todayColor = todayMins >= 240 ? "#2A9D8F" : todayMins >= 120 ? "#F4A261" : "#E63946";
 
   // Midnight countdown
@@ -185,7 +260,10 @@ function CountdownBanner({ sessions }) {
   let midColor;
   if (hr < 12) midColor = "#2A9D8F"; else if (hr < 15) midColor = "#F4A261"; else if (hr < 18) midColor = "#E76F51"; else if (hr < 21) midColor = "#E63946"; else midColor = "#C1121F";
 
-  // Target date countdown
+  // Target date
+  const [targetDate, setTargetDate] = useState(() => localStorage.getItem("sl_targetDate") || "");
+  const [editingTarget, setEditingTarget] = useState(false);
+  const [tempTarget, setTempTarget] = useState("");
   const saveTarget = () => { localStorage.setItem("sl_targetDate", tempTarget); setTargetDate(tempTarget); setEditingTarget(false); };
   let targetText = "";
   if (targetDate) {
@@ -196,39 +274,139 @@ function CountdownBanner({ sessions }) {
   }
 
   return (
-    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontFamily: font, fontSize: 13, fontWeight: 700, marginBottom: 12 }}>
-      <span style={{ color: todayColor }}>📖 {formatHM(todayMins)} today</span>
-      <span style={{ color: midColor }}>⏳ {hrsLeft}h {mLeft}m left</span>
-      {editingTarget ? (
-        <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-          <input type="date" value={tempTarget} onChange={e => setTempTarget(e.target.value)} style={{ border: "1px solid #ccc", padding: "4px 6px", fontSize: 11, fontFamily: font, outline: "none" }} />
-          <button onClick={saveTarget} style={{ border: "none", background: "#000", color: "#fff", padding: "4px 8px", fontSize: 10, fontFamily: font, fontWeight: 700, cursor: "pointer", borderRadius: 4 }}>Set</button>
-        </span>
-      ) : (
-        <span onDoubleClick={() => { setTempTarget(targetDate || todayStr()); setEditingTarget(true); }} style={{ color: "#6A4C93", cursor: "pointer" }} title="Double-click to set target date">
-          {targetDate ? `🎯 ${targetText}` : "🎯 Set goal"}
-        </span>
-      )}
+    <div style={{ background: "#f6f6f6", borderRadius: 10, padding: "12px 14px", marginBottom: 20, fontFamily: font }}>
+      {/* Week circles + total */}
+      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 3, flex: 1 }}>
+          {weekDays.map((dateKey, i) => {
+            const mins = dayTotals[dateKey] || 0;
+            const isFire = mins >= 120;
+            const isToday = dateKey === todayKey;
+            const hasData = mins > 0;
+            const isMissed = isPastDate(dateKey) && !isFire && dateKey >= weekDays[0];
+            const size = 32;
+            return (
+              <div key={dateKey} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, flex: 1 }}>
+                <span style={{ fontSize: 8, fontWeight: 600, letterSpacing: "0.05em", color: isToday ? "#000" : "#bbb", textTransform: "uppercase" }}>{dayLabels[i]}</span>
+                <div style={{
+                  width: size, height: size, borderRadius: "50%",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  background: isFire ? "#000" : isMissed ? "#fff0f0" : isToday ? "#e8e8e8" : "transparent",
+                  border: isFire ? "none" : isMissed ? "2px solid #E63946" : hasData ? "2px solid #ddd" : isToday ? "2px solid #ccc" : "2px solid #eee",
+                  color: isFire ? "#fff" : isMissed ? "#E63946" : "#999",
+                  fontSize: isFire ? 14 : isMissed ? 12 : 9, fontWeight: 700,
+                  transition: "all 0.2s ease",
+                  boxShadow: isFire ? "0 1px 6px rgba(0,0,0,0.15)" : "none"
+                }}>
+                  {isFire ? "🔥" : isMissed ? "❌" : hasData ? formatHM(mins) : "·"}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <span style={{ fontSize: 13, fontWeight: 700, marginLeft: 6, whiteSpace: "nowrap" }}>{formatHM(weekTotal)}</span>
+      </div>
+
+      {/* Today hours | countdown | target */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12, fontWeight: 700 }}>
+        <span style={{ color: todayColor }}>📖 {formatHM(todayMins)} today</span>
+        <span style={{ color: midColor }}>⏳ {hrsLeft}h {mLeft}m left</span>
+        {editingTarget ? (
+          <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            <input type="date" value={tempTarget} onChange={e => setTempTarget(e.target.value)} style={{ border: "1px solid #ccc", padding: "3px 5px", fontSize: 10, fontFamily: font, outline: "none" }} />
+            <button onClick={saveTarget} style={{ border: "none", background: "#000", color: "#fff", padding: "3px 7px", fontSize: 9, fontFamily: font, fontWeight: 700, cursor: "pointer", borderRadius: 4 }}>Set</button>
+          </span>
+        ) : (
+          <span onDoubleClick={() => { setTempTarget(targetDate || todayStr()); setEditingTarget(true); }} style={{ color: "#6A4C93", cursor: "pointer" }} title="Double-click to set target date">
+            {targetDate ? `🎯 ${targetText}` : "🎯 Set goal"}
+          </span>
+        )}
+      </div>
     </div>
   );
 }
 
-// ─── Quotes Banner ───
-function QuotesBanner() {
-  const [idx, setIdx] = useState(() => Math.floor(Math.random() * QUOTES.length));
-  useEffect(() => {
-    const t = setInterval(() => setIdx(p => (p + 1) % QUOTES.length), 180000);
-    return () => clearInterval(t);
-  }, []);
+// ═══════════════════════════════════════════
+// ─── SIDEBAR ───
+// ═══════════════════════════════════════════
+function Sidebar({ open, onClose, page, setPage, sessions, onLogout }) {
+  const font = "'Nunito', sans-serif";
+  const items = [
+    { key: PAGES.TIMER, label: "Timer", icon: "⏱" },
+    { key: PAGES.TASKS, label: "Tasks", icon: "✅" },
+    { key: PAGES.ANALYSIS, label: "Analysis", icon: "📊" },
+    { key: PAGES.CALENDAR, label: "Calendar", icon: "📅" },
+    { key: PAGES.REFLECTION, label: "Reflect", icon: "💭" },
+    { key: PAGES.SLEEP, label: "Sleep", icon: "🌙" },
+  ];
+
+  const now = new Date();
+  const yearStr = String(now.getFullYear());
+  const monthName = now.toLocaleDateString("en-US", { month: "short" });
+  const yearMins = sessions.filter(s => s.date.startsWith(yearStr)).reduce((a, s) => a + s.duration, 0);
+  const monthPrefix = `${yearStr}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const monthMins = sessions.filter(s => s.date.startsWith(monthPrefix)).reduce((a, s) => a + s.duration, 0);
+
   return (
-    <div style={{
-      textAlign: "center", fontFamily: "'Nunito', sans-serif", fontSize: 13,
-      fontWeight: 600, color: "#666", fontStyle: "italic", marginBottom: 16,
-      padding: "10px 16px", background: "#f8f8f8", borderRadius: 8,
-      transition: "opacity 0.5s ease"
-    }}>
-      "{QUOTES[idx]}"
-    </div>
+    <>
+      {/* Overlay */}
+      <div onClick={onClose} style={{
+        position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 2000,
+        opacity: open ? 1 : 0, pointerEvents: open ? "auto" : "none",
+        transition: "opacity 0.3s ease"
+      }} />
+      {/* Drawer */}
+      <div style={{
+        position: "fixed", top: 0, left: 0, bottom: 0, width: 260, zIndex: 2001,
+        background: "#fff", boxShadow: "4px 0 24px rgba(0,0,0,0.12)",
+        transform: open ? "translateX(0)" : "translateX(-100%)",
+        transition: "transform 0.3s ease",
+        display: "flex", flexDirection: "column", fontFamily: font
+      }}>
+        {/* Header */}
+        <div style={{ padding: "24px 20px 16px", borderBottom: "1px solid #eee" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+            <span style={{ fontSize: 18, fontWeight: 800, letterSpacing: "-0.02em" }}>Focus Maxing</span>
+            <button onClick={onClose} style={{ border: "none", background: "none", cursor: "pointer", fontSize: 20, color: "#999", padding: 0 }}>✕</button>
+          </div>
+          {/* Stats */}
+          <div style={{ display: "flex", gap: 16, fontSize: 12 }}>
+            <div><div style={{ fontSize: 16, fontWeight: 700 }}>{formatHM(monthMins)}</div><div style={{ color: "#999", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.08em" }}>{monthName}</div></div>
+            <div><div style={{ fontSize: 16, fontWeight: 700 }}>{formatHM(yearMins)}</div><div style={{ color: "#999", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.08em" }}>{yearStr}</div></div>
+          </div>
+        </div>
+
+        {/* Nav items */}
+        <div style={{ flex: 1, padding: "12px 0", overflowY: "auto" }}>
+          {items.map(i => {
+            const active = page === i.key;
+            return (
+              <button key={i.key} onClick={() => { setPage(i.key); onClose(); }} style={{
+                display: "flex", alignItems: "center", gap: 12, width: "100%",
+                padding: "14px 24px", border: "none", cursor: "pointer",
+                background: active ? "#f0f0f0" : "transparent",
+                color: "#000", fontSize: 14, fontWeight: active ? 700 : 500,
+                fontFamily: font, textAlign: "left", transition: "background 0.15s ease",
+                borderLeft: active ? "3px solid #000" : "3px solid transparent"
+              }}>
+                <span style={{ fontSize: 18 }}>{i.icon}</span>
+                <span>{i.label}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Logout */}
+        <div style={{ padding: "16px 20px", borderTop: "1px solid #eee" }}>
+          <button onClick={onLogout} style={{
+            width: "100%", padding: "10px 0", border: "1px solid #ddd",
+            background: "transparent", cursor: "pointer", fontSize: 11,
+            fontFamily: font, fontWeight: 700, color: "#999",
+            letterSpacing: "0.06em", textTransform: "uppercase", borderRadius: 6
+          }}>Logout</button>
+        </div>
+      </div>
+    </>
   );
 }
 
@@ -299,134 +477,6 @@ function AuthPage({ onAuth }) {
         <button onClick={handleSubmit} disabled={loading} style={{ width: "100%", padding: "14px 0", border: "2px solid #000", background: "#000", color: "#fff", fontSize: 13, fontFamily: font, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", cursor: loading ? "default" : "pointer", marginTop: 16, opacity: loading ? 0.5 : 1 }}>{loading ? "..." : isLogin ? "Login" : "Create Account"}</button>
       </div>
       <div style={{ marginTop: 60, fontSize: 12, color: "#ccc", fontFamily: font, textAlign: "center" }}>Vibe coded by Nithin Chowdary ❤️</div>
-    </div>
-  );
-}
-
-// ─── Streak Badge (fixed top-right) ───
-function StreakBadge({ streak, todayMins }) {
-  const hitTarget = todayMins >= 120;
-  return (
-    <div style={{
-      position: "fixed", top: 16, right: 20, zIndex: 999,
-      display: "flex", alignItems: "center", gap: 7,
-      background: hitTarget ? (streak > 0 ? "#000" : "#e0e0e0") : "#E63946",
-      color: hitTarget ? (streak > 0 ? "#fff" : "#999") : "#fff",
-      padding: "10px 18px", borderRadius: 40,
-      fontFamily: "'Nunito', sans-serif", fontSize: 15, fontWeight: 700,
-      letterSpacing: "0.02em",
-      boxShadow: "0 2px 12px rgba(0,0,0,0.18)",
-      transition: "all 0.3s ease"
-    }}>
-      <span style={{ fontSize: 20 }}>{hitTarget ? (streak > 0 ? "🔥" : "○") : "⚠️"}</span>
-      <span>{streak}</span>
-      <span style={{ fontWeight: 400, fontSize: 12, opacity: 0.8, marginLeft: 2 }}>
-        {hitTarget ? (streak === 1 ? "day" : "days") : "do 2h+"}
-      </span>
-    </div>
-  );
-}
-
-// ─── Nav (5 tabs) ───
-function Nav({ page, setPage }) {
-  const items = [
-    { key: PAGES.TIMER, label: "Timer" },
-    { key: PAGES.TASKS, label: "Tasks" },
-    { key: PAGES.ANALYSIS, label: "Analysis" },
-    { key: PAGES.CALENDAR, label: "Calendar" },
-    { key: PAGES.REFLECTION, label: "Reflect" },
-    { key: PAGES.SLEEP, label: "Sleep" },
-  ];
-  return (
-    <nav style={{ display: "flex", gap: 0, borderBottom: "2px solid #000", marginBottom: 40, fontFamily: "'Nunito', sans-serif" }}>
-      {items.map(i => (
-        <button key={i.key} onClick={() => setPage(i.key)} style={{
-          flex: 1, padding: "14px 0", border: "none", cursor: "pointer",
-          background: page === i.key ? "#000" : "transparent",
-          color: page === i.key ? "#fff" : "#000",
-          fontSize: 11, fontWeight: 600, letterSpacing: "0.04em",
-          textTransform: "uppercase", fontFamily: "inherit", transition: "all 0.2s ease"
-        }}>{i.label}</button>
-      ))}
-    </nav>
-  );
-}
-
-// ─── Top Stats Bar ───
-function TopBar({ sessions }) {
-  const font = "'Nunito', sans-serif";
-  const dayTotals = getDayTotals(sessions);
-  const maxMins = Object.values(dayTotals).length > 0 ? Math.max(...Object.values(dayTotals)) : 0;
-  const now = new Date();
-  const yearStr = String(now.getFullYear());
-  const monthName = now.toLocaleDateString("en-US", { month: "short" });
-  const yearMins = sessions.filter(s => s.date.startsWith(yearStr)).reduce((a, s) => a + s.duration, 0);
-  const monthPrefix = `${yearStr}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-  const monthMins = sessions.filter(s => s.date.startsWith(monthPrefix)).reduce((a, s) => a + s.duration, 0);
-  const today = new Date();
-  const todayKey = todayStr();
-  const dayOfWeek = today.getDay();
-  const mon = new Date(today); mon.setDate(today.getDate() - ((dayOfWeek + 6) % 7));
-  const weekDays = [];
-  for (let i = 0; i < 7; i++) { const dd = new Date(mon); dd.setDate(mon.getDate() + i); weekDays.push(dd.toISOString().slice(0, 10)); }
-  const dayLabels = ["M", "T", "W", "TH", "F", "SA", "SU"];
-  const weekTotal = weekDays.reduce((a, d) => a + (dayTotals[d] || 0), 0);
-
-  const fixedPill = {
-    display: "flex", alignItems: "center", gap: 7,
-    background: "#000", color: "#fff",
-    padding: "10px 18px", borderRadius: 40,
-    fontFamily: font, fontSize: 15, fontWeight: 700,
-    letterSpacing: "0.02em", boxShadow: "0 2px 12px rgba(0,0,0,0.18)"
-  };
-  const lblStyle = { fontWeight: 400, fontSize: 12, opacity: 0.6 };
-  const inlinePill = {
-    display: "inline-flex", alignItems: "center", gap: 7,
-    background: "#000", color: "#fff",
-    padding: "8px 14px", borderRadius: 40,
-    fontFamily: font, fontSize: 13, fontWeight: 700,
-    boxShadow: "0 2px 12px rgba(0,0,0,0.18)"
-  };
-
-  return (
-    <div style={{ marginBottom: 20 }}>
-      {/* Fixed top-left stat pills */}
-      <div style={{ position: "fixed", top: 14, left: 16, zIndex: 999, display: "flex", flexDirection: "column", gap: 6 }}>
-        <div style={fixedPill}><span>⚡</span><span>{formatHM(maxMins)}</span><span style={lblStyle}>max</span></div>
-        <div style={fixedPill}><span>📊</span><span>{formatHM(monthMins)}</span><span style={lblStyle}>{monthName}</span></div>
-        <div style={fixedPill}><span>📅</span><span>{formatHM(yearMins)}</span><span style={lblStyle}>{yearStr}</span></div>
-      </div>
-      {/* Week bar with weekly total pill */}
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 4, fontFamily: font, flex: 1 }}>
-          {weekDays.map((dateKey, i) => {
-            const mins = dayTotals[dateKey] || 0;
-            const isFire = mins >= 120;
-            const isToday = dateKey === todayKey;
-            const hasData = mins > 0;
-            const isMissed = isPastDate(dateKey) && !isFire && dateKey >= weekDays[0];
-            const size = 36;
-            return (
-              <div key={dateKey} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, flex: 1 }}>
-                <span style={{ fontSize: 9, fontWeight: 600, letterSpacing: "0.05em", color: isToday ? "#000" : "#bbb", textTransform: "uppercase" }}>{dayLabels[i]}</span>
-                <div style={{
-                  width: size, height: size, borderRadius: "50%",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  background: isFire ? "#000" : isMissed ? "#fff0f0" : isToday ? "#f0f0f0" : "transparent",
-                  border: isFire ? "none" : isMissed ? "2px solid #E63946" : hasData ? "2px solid #ddd" : isToday ? "2px solid #ccc" : "2px solid #f0f0f0",
-                  color: isFire ? "#fff" : isMissed ? "#E63946" : "#999",
-                  fontSize: isFire ? 16 : isMissed ? 14 : 10, fontWeight: 700,
-                  transition: "all 0.2s ease",
-                  boxShadow: isFire ? "0 2px 8px rgba(0,0,0,0.15)" : "none"
-                }}>
-                  {isFire ? "🔥" : isMissed ? "❌" : hasData ? formatHM(mins) : "·"}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-        <div style={inlinePill}>{formatHM(weekTotal)}</div>
-      </div>
     </div>
   );
 }
@@ -579,165 +629,100 @@ function TimerPage({ sessions, setSessions }) {
           </div>
         ))}
       </div>
+      {/* Footer only on timer page */}
+      <div style={{ marginTop: 48, padding: "14px 20px", borderRadius: 12, background: "#E8F4FD", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <span style={{ fontSize: 13, fontWeight: 600, color: "#4A5568", letterSpacing: "0.01em" }}>
+          Vibe coded by Nithin Chowdary <span style={{ color: "#E53E3E", fontSize: 15 }}>❤️</span>
+        </span>
+      </div>
     </div>
   );
 }
 
 // ═══════════════════════════════════════════
-// ─── Tasks Page ───
+// ─── Tasks Page (unchanged) ───
 // ═══════════════════════════════════════════
 function TasksPage({ tasks, setTasks }) {
   const [selectedDate, setSelectedDate] = useState(todayStr());
   const [newTask, setNewTask] = useState("");
   const font = "'Nunito', sans-serif";
   const isToday = selectedDate === todayStr();
-
-  const shiftDate = (dir) => {
-    const d = new Date(selectedDate + "T12:00:00"); d.setDate(d.getDate() + dir);
-    setSelectedDate(d.toISOString().slice(0, 10));
-  };
+  const shiftDate = (dir) => { const d = new Date(selectedDate + "T12:00:00"); d.setDate(d.getDate() + dir); setSelectedDate(d.toISOString().slice(0, 10)); };
   const dateLabel = isToday ? "Today" : new Date(selectedDate + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
-
   const dayTasks = tasks.filter(t => t.date === selectedDate && !t.time_slot);
   const dayPlannerTasks = tasks.filter(t => t.date === selectedDate && t.time_slot);
-
-  const addTask = async () => {
-    if (!newTask.trim()) return;
-    const saved = await insertTask(newTask.trim(), selectedDate, null);
-    if (saved) setTasks(prev => [...prev, saved]);
-    setNewTask("");
-  };
-
-  const toggleComplete = async (task) => {
-    const newVal = task.completed_date ? null : todayStr();
-    await updateTaskCompleted(task.id, newVal);
-    setTasks(prev => prev.map(t => t.id === task.id ? { ...t, completed_date: newVal } : t));
-  };
-
-  const removeTask = async (taskId) => {
-    await deleteTask(taskId);
-    setTasks(prev => prev.filter(t => t.id !== taskId));
-  };
-
-  // Day Planner: hourly slots 4am-12am
+  const addTask = async () => { if (!newTask.trim()) return; const saved = await insertTask(newTask.trim(), selectedDate, null); if (saved) setTasks(prev => [...prev, saved]); setNewTask(""); };
+  const toggleComplete = async (task) => { const newVal = task.completed_date ? null : todayStr(); await updateTaskCompleted(task.id, newVal); setTasks(prev => prev.map(t => t.id === task.id ? { ...t, completed_date: newVal } : t)); };
+  const removeTask = async (taskId) => { await deleteTask(taskId); setTasks(prev => prev.filter(t => t.id !== taskId)); };
   const slots = [];
-  for (let h = 4; h <= 23; h++) {
-    const fmt = (hr) => { if (hr === 0) return "12 AM"; if (hr < 12) return `${hr} AM`; if (hr === 12) return "12 PM"; return `${hr - 12} PM`; };
-    slots.push({ label: `${fmt(h)} – ${fmt(h + 1 > 23 ? 0 : h + 1)}`, key: `${h}-${h + 1}` });
-  }
-
-  const addPlannerTask = async (slotKey, title) => {
-    if (!title.trim()) return;
-    // Only 1 task per slot — check if slot already has one
-    const existing = dayPlannerTasks.find(t => t.time_slot === slotKey);
-    if (existing) return;
-    const saved = await insertTask(title.trim(), selectedDate, slotKey);
-    if (saved) setTasks(prev => [...prev, saved]);
-  };
-
+  for (let h = 4; h <= 23; h++) { const fmt = (hr) => { if (hr === 0) return "12 AM"; if (hr < 12) return `${hr} AM`; if (hr === 12) return "12 PM"; return `${hr - 12} PM`; }; slots.push({ label: `${fmt(h)} – ${fmt(h + 1 > 23 ? 0 : h + 1)}`, key: `${h}-${h + 1}` }); }
+  const addPlannerTask = async (slotKey, title) => { if (!title.trim()) return; const existing = dayPlannerTasks.find(t => t.time_slot === slotKey); if (existing) return; const saved = await insertTask(title.trim(), selectedDate, slotKey); if (saved) setTasks(prev => [...prev, saved]); };
   const navBtn = { border: "none", background: "none", fontSize: 20, cursor: "pointer" };
-
   return (
     <div>
-      {/* Date nav */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 24, marginBottom: 24, fontFamily: font }}>
         <button onClick={() => shiftDate(-1)} style={navBtn}>←</button>
         <span style={{ fontSize: 16, fontWeight: 700, minWidth: 140, textAlign: "center" }}>{dateLabel}</span>
         <button onClick={() => shiftDate(1)} style={navBtn}>→</button>
       </div>
-
-      {/* Add task */}
       <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
-        <input value={newTask} onChange={e => setNewTask(e.target.value)} placeholder="Add a task..." onKeyDown={e => e.key === "Enter" && addTask()}
-          style={{ flex: 1, border: "2px solid #000", padding: "12px 16px", fontSize: 15, fontFamily: font, background: "transparent", outline: "none", fontWeight: 600 }} />
+        <input value={newTask} onChange={e => setNewTask(e.target.value)} placeholder="Add a task..." onKeyDown={e => e.key === "Enter" && addTask()} style={{ flex: 1, border: "2px solid #000", padding: "12px 16px", fontSize: 15, fontFamily: font, background: "transparent", outline: "none", fontWeight: 600 }} />
         <button onClick={addTask} style={{ padding: "12px 22px", border: "2px solid #000", background: "#000", color: "#fff", fontSize: 14, fontFamily: font, fontWeight: 700, cursor: "pointer" }}>+</button>
       </div>
-
-      {/* Task list */}
       <div style={{ fontSize: 11, fontFamily: font, textTransform: "uppercase", letterSpacing: "0.15em", color: "#999", marginBottom: 10, fontWeight: 600 }}>Tasks ({dayTasks.filter(t => t.completed_date).length}/{dayTasks.length})</div>
       {dayTasks.length === 0 && (<div style={{ color: "#ccc", fontFamily: font, fontSize: 14, padding: "20px 0", textAlign: "center" }}>No tasks for this day</div>)}
-      {dayTasks.map(t => {
-        const done = !!t.completed_date;
-        return (
-          <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 0", borderBottom: "1px solid #f0f0f0", fontFamily: font, fontSize: 15 }}>
-            <button onClick={() => toggleComplete(t)} style={{ width: 26, height: 26, border: done ? "none" : "2px solid #ccc", background: done ? "#2A9D8F" : "transparent", borderRadius: 6, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 15, flexShrink: 0 }}>
-              {done && "✓"}
-            </button>
-            <span style={{ flex: 1, fontWeight: 600, textDecoration: done ? "line-through" : "none", color: done ? "#999" : "#000" }}>{t.title}</span>
-            <button onClick={() => removeTask(t.id)} style={{ border: "none", background: "none", cursor: "pointer", color: "#ccc", fontSize: 18, padding: "0 4px" }}>✕</button>
-          </div>
-        );
-      })}
-
-      {/* Day Planner — always visible below tasks */}
+      {dayTasks.map(t => { const done = !!t.completed_date; return (
+        <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 0", borderBottom: "1px solid #f0f0f0", fontFamily: font, fontSize: 15 }}>
+          <button onClick={() => toggleComplete(t)} style={{ width: 26, height: 26, border: done ? "none" : "2px solid #ccc", background: done ? "#2A9D8F" : "transparent", borderRadius: 6, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 15, flexShrink: 0 }}>{done && "✓"}</button>
+          <span style={{ flex: 1, fontWeight: 600, textDecoration: done ? "line-through" : "none", color: done ? "#999" : "#000" }}>{t.title}</span>
+          <button onClick={() => removeTask(t.id)} style={{ border: "none", background: "none", cursor: "pointer", color: "#ccc", fontSize: 18, padding: "0 4px" }}>✕</button>
+        </div>
+      ); })}
       <div style={{ marginTop: 36 }}>
         <div style={{ fontSize: 11, fontFamily: font, textTransform: "uppercase", letterSpacing: "0.15em", color: "#999", marginBottom: 12, fontWeight: 600 }}>Day Planner</div>
         <div style={{ border: "2px solid #eee", borderRadius: 6, overflow: "hidden" }}>
-          {slots.map(slot => {
-            const slotTask = dayPlannerTasks.find(t => t.time_slot === slot.key);
-            const done = slotTask && !!slotTask.completed_date;
-            return (
-              <div key={slot.key} style={{ display: "flex", borderBottom: "1px solid #f0f0f0", fontFamily: font, minHeight: 42 }}>
-                <div style={{ width: 120, padding: "10px 12px", background: "#f8f8f8", fontWeight: 600, color: "#555", flexShrink: 0, display: "flex", alignItems: "center", fontSize: 13 }}>{slot.label}</div>
-                <div style={{ flex: 1, padding: "8px 12px", display: "flex", alignItems: "center", gap: 10 }}>
-                  {slotTask ? (
-                    <>
-                      <button onClick={() => toggleComplete(slotTask)} style={{ width: 22, height: 22, border: done ? "none" : "2px solid #ccc", background: done ? "#2A9D8F" : "transparent", borderRadius: 5, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 13, flexShrink: 0 }}>{done && "✓"}</button>
-                      <span style={{ flex: 1, fontSize: 14, fontWeight: 600, textDecoration: done ? "line-through" : "none", color: done ? "#999" : "#000" }}>{slotTask.title}</span>
-                      <button onClick={() => removeTask(slotTask.id)} style={{ border: "none", background: "none", cursor: "pointer", color: "#ccc", fontSize: 16 }}>✕</button>
-                    </>
-                  ) : (
-                    <PlannerSlotInput slotKey={slot.key} onAdd={(title) => addPlannerTask(slot.key, title)} />
-                  )}
-                </div>
+          {slots.map(slot => { const slotTask = dayPlannerTasks.find(t => t.time_slot === slot.key); const done = slotTask && !!slotTask.completed_date; return (
+            <div key={slot.key} style={{ display: "flex", borderBottom: "1px solid #f0f0f0", fontFamily: font, minHeight: 42 }}>
+              <div style={{ width: 120, padding: "10px 12px", background: "#f8f8f8", fontWeight: 600, color: "#555", flexShrink: 0, display: "flex", alignItems: "center", fontSize: 13 }}>{slot.label}</div>
+              <div style={{ flex: 1, padding: "8px 12px", display: "flex", alignItems: "center", gap: 10 }}>
+                {slotTask ? (<>
+                  <button onClick={() => toggleComplete(slotTask)} style={{ width: 22, height: 22, border: done ? "none" : "2px solid #ccc", background: done ? "#2A9D8F" : "transparent", borderRadius: 5, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 13, flexShrink: 0 }}>{done && "✓"}</button>
+                  <span style={{ flex: 1, fontSize: 14, fontWeight: 600, textDecoration: done ? "line-through" : "none", color: done ? "#999" : "#000" }}>{slotTask.title}</span>
+                  <button onClick={() => removeTask(slotTask.id)} style={{ border: "none", background: "none", cursor: "pointer", color: "#ccc", fontSize: 16 }}>✕</button>
+                </>) : (<PlannerSlotInput slotKey={slot.key} onAdd={(title) => addPlannerTask(slot.key, title)} />)}
               </div>
-            );
-          })}
+            </div>
+          ); })}
         </div>
       </div>
     </div>
   );
 }
-
 function PlannerSlotInput({ slotKey, onAdd }) {
   const [val, setVal] = useState("");
   const submit = () => { if (val.trim()) { onAdd(val.trim()); setVal(""); } };
-  return (
-    <input value={val} onChange={e => setVal(e.target.value)} onKeyDown={e => e.key === "Enter" && submit()}
-      placeholder="+ add task" style={{ border: "none", background: "transparent", fontSize: 13, fontFamily: "'Nunito', sans-serif", fontWeight: 600, outline: "none", color: "#bbb", padding: "4px 0", width: "100%" }} />
-  );
+  return (<input value={val} onChange={e => setVal(e.target.value)} onKeyDown={e => e.key === "Enter" && submit()} placeholder="+ add task" style={{ border: "none", background: "transparent", fontSize: 13, fontFamily: "'Nunito', sans-serif", fontWeight: 600, outline: "none", color: "#bbb", padding: "4px 0", width: "100%" }} />);
 }
 
 // ─── Shared chart components ───
 const TAG_COLORS = ["#E63946","#457B9D","#2A9D8F","#E9C46A","#F4A261","#6A4C93","#1982C4","#8AC926","#FF595E","#6D6875","#264653","#F77F00","#D62828","#023E8A","#606C38"];
 function getTagColor(tag, allTags) { return TAG_COLORS[allTags.indexOf(tag) % TAG_COLORS.length]; }
-function getWeekRange(dateStr) {
-  const d = new Date(dateStr + "T12:00:00"); const mon = new Date(d); mon.setDate(d.getDate() - ((d.getDay() + 6) % 7));
-  const days = []; for (let i = 0; i < 7; i++) { const dd = new Date(mon); dd.setDate(mon.getDate() + i); days.push(dd.toISOString().slice(0, 10)); } return days;
-}
-function getMonthDates(year, month) {
-  const n = new Date(year, month + 1, 0).getDate(); const dates = [];
-  for (let d = 1; d <= n; d++) dates.push(`${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`); return dates;
-}
-function SectionHeader({ children }) {
-  return (<div style={{ fontSize: 11, fontFamily: "'Nunito', sans-serif", textTransform: "uppercase", letterSpacing: "0.15em", color: "#999", marginBottom: 14, fontWeight: 600, marginTop: 40 }}>{children}</div>);
-}
+function getWeekRange(dateStr) { const d = new Date(dateStr + "T12:00:00"); const mon = new Date(d); mon.setDate(d.getDate() - ((d.getDay() + 6) % 7)); const days = []; for (let i = 0; i < 7; i++) { const dd = new Date(mon); dd.setDate(mon.getDate() + i); days.push(dd.toISOString().slice(0, 10)); } return days; }
+function getMonthDates(year, month) { const n = new Date(year, month + 1, 0).getDate(); const dates = []; for (let d = 1; d <= n; d++) dates.push(`${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`); return dates; }
+function SectionHeader({ children }) { return (<div style={{ fontSize: 11, fontFamily: "'Nunito', sans-serif", textTransform: "uppercase", letterSpacing: "0.15em", color: "#999", marginBottom: 14, fontWeight: 600, marginTop: 40 }}>{children}</div>); }
 function TagBarChart({ sorted, allTags }) {
   if (sorted.length === 0) return null;
   const maxVal = sorted[0][1]; const barH = 160;
   return (
     <div style={{ overflowX: "auto", paddingBottom: 8 }}>
       <div style={{ display: "flex", alignItems: "flex-end", gap: 6, minWidth: sorted.length * 64, height: barH + 40, paddingTop: 20 }}>
-        {sorted.map(([tag, mins]) => {
-          const h = maxVal > 0 ? (mins / maxVal) * barH : 0; const color = getTagColor(tag, allTags);
-          return (
-            <div key={tag} style={{ flex: 1, minWidth: 48, maxWidth: 80, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", height: barH + 40 }}>
-              <span style={{ fontSize: 11, fontFamily: "'Nunito', sans-serif", fontWeight: 700, marginBottom: 4, color }}>{formatHM(mins)}</span>
-              <div style={{ width: "100%", height: h, background: color, borderRadius: "4px 4px 0 0", transition: "height 0.4s ease", minHeight: mins > 0 ? 6 : 0 }} />
-              <span style={{ fontSize: 10, fontFamily: "'Nunito', sans-serif", marginTop: 6, textAlign: "center", color: "#666", maxWidth: 80, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", width: "100%" }}>{tag}</span>
-            </div>
-          );
-        })}
+        {sorted.map(([tag, mins]) => { const h = maxVal > 0 ? (mins / maxVal) * barH : 0; const color = getTagColor(tag, allTags); return (
+          <div key={tag} style={{ flex: 1, minWidth: 48, maxWidth: 80, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", height: barH + 40 }}>
+            <span style={{ fontSize: 11, fontFamily: "'Nunito', sans-serif", fontWeight: 700, marginBottom: 4, color }}>{formatHM(mins)}</span>
+            <div style={{ width: "100%", height: h, background: color, borderRadius: "4px 4px 0 0", transition: "height 0.4s ease", minHeight: mins > 0 ? 6 : 0 }} />
+            <span style={{ fontSize: 10, fontFamily: "'Nunito', sans-serif", marginTop: 6, textAlign: "center", color: "#666", maxWidth: 80, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", width: "100%" }}>{tag}</span>
+          </div>
+        ); })}
       </div>
     </div>
   );
@@ -755,36 +740,18 @@ function PeriodBarChart({ dates, sessions }) {
   return (
     <div>
       <div style={{ display: "flex", gap: 24, marginBottom: 16, fontFamily: "'Nunito', sans-serif" }}>
-        {[["Total", totalMins], ["Peak", peakVal], ["Avg/day", avgMins]].map(([label, val]) => (
-          <div key={label}><div style={{ fontSize: 22, fontWeight: 700 }}>{formatHM(val)}</div><div style={{ fontSize: 10, color: "#999", textTransform: "uppercase", letterSpacing: "0.1em" }}>{label}</div></div>
-        ))}
+        {[["Total", totalMins], ["Peak", peakVal], ["Avg/day", avgMins]].map(([label, val]) => (<div key={label}><div style={{ fontSize: 22, fontWeight: 700 }}>{formatHM(val)}</div><div style={{ fontSize: 10, color: "#999", textTransform: "uppercase", letterSpacing: "0.1em" }}>{label}</div></div>))}
       </div>
       <div style={{ position: "relative", overflowX: "auto", paddingBottom: 8 }}>
         <div style={{ display: "flex", alignItems: "flex-end", gap: isWeekly ? 8 : 2, minWidth: isWeekly ? dates.length * 52 : dates.length * 16, height: barH + 50, paddingTop: 24, position: "relative" }}>
-          {peakVal > 0 && (
-            <div style={{ position: "absolute", top: 24, left: 0, right: 0, height: barH, pointerEvents: "none" }}>
-              <div style={{ position: "absolute", bottom: `${(peakVal / maxVal) * barH}px`, left: 0, right: 0, borderTop: "2px dashed #E63946", opacity: 0.6 }} />
-              <span style={{ position: "absolute", bottom: `${(peakVal / maxVal) * barH + 4}px`, right: 0, fontSize: 9, color: "#E63946", fontFamily: "'Nunito', sans-serif", fontWeight: 700 }}>PEAK {formatHM(peakVal)}</span>
+          {peakVal > 0 && (<div style={{ position: "absolute", top: 24, left: 0, right: 0, height: barH, pointerEvents: "none" }}><div style={{ position: "absolute", bottom: `${(peakVal / maxVal) * barH}px`, left: 0, right: 0, borderTop: "2px dashed #E63946", opacity: 0.6 }} /><span style={{ position: "absolute", bottom: `${(peakVal / maxVal) * barH + 4}px`, right: 0, fontSize: 9, color: "#E63946", fontFamily: "'Nunito', sans-serif", fontWeight: 700 }}>PEAK {formatHM(peakVal)}</span></div>)}
+          {data.map((d) => { const h = maxVal > 0 ? (d.mins / maxVal) * barH : 0; const isPeak = d.mins === peakVal && d.mins > 0; const dayLabel = isWeekly ? new Date(d.date + "T12:00:00").toLocaleDateString("en-US", { weekday: "short" }) : String(new Date(d.date + "T12:00:00").getDate()); return (
+            <div key={d.date} style={{ flex: 1, minWidth: isWeekly ? 40 : 10, maxWidth: isWeekly ? 60 : 24, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", height: barH + 50 }}>
+              {isWeekly && d.mins > 0 && (<span style={{ fontSize: 10, fontFamily: "'Nunito', sans-serif", fontWeight: 600, marginBottom: 3, color: isPeak ? "#E63946" : "#666" }}>{formatHM(d.mins)}</span>)}
+              <div style={{ width: "100%", height: h, background: isPeak ? "linear-gradient(180deg, #E63946, #FF6B6B)" : getBarGradient(d.mins), borderRadius: "3px 3px 0 0", transition: "height 0.4s ease", minHeight: d.mins > 0 ? 4 : 2, position: "relative" }}>{isPeak && (<div style={{ position: "absolute", top: -16, left: "50%", transform: "translateX(-50%)", fontSize: 12 }}>⭐</div>)}</div>
+              <span style={{ fontSize: isWeekly ? 10 : 8, fontFamily: "'Nunito', sans-serif", marginTop: 4, color: isPeak ? "#E63946" : "#999", fontWeight: isPeak ? 700 : 400 }}>{dayLabel}</span>
             </div>
-          )}
-          {data.map((d) => {
-            const h = maxVal > 0 ? (d.mins / maxVal) * barH : 0;
-            const isPeak = d.mins === peakVal && d.mins > 0;
-            const dayLabel = isWeekly ? new Date(d.date + "T12:00:00").toLocaleDateString("en-US", { weekday: "short" }) : String(new Date(d.date + "T12:00:00").getDate());
-            return (
-              <div key={d.date} style={{ flex: 1, minWidth: isWeekly ? 40 : 10, maxWidth: isWeekly ? 60 : 24, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", height: barH + 50 }}>
-                {isWeekly && d.mins > 0 && (<span style={{ fontSize: 10, fontFamily: "'Nunito', sans-serif", fontWeight: 600, marginBottom: 3, color: isPeak ? "#E63946" : "#666" }}>{formatHM(d.mins)}</span>)}
-                <div style={{
-                  width: "100%", height: h,
-                  background: isPeak ? "linear-gradient(180deg, #E63946, #FF6B6B)" : getBarGradient(d.mins),
-                  borderRadius: "3px 3px 0 0", transition: "height 0.4s ease", minHeight: d.mins > 0 ? 4 : 2, position: "relative"
-                }}>
-                  {isPeak && (<div style={{ position: "absolute", top: -16, left: "50%", transform: "translateX(-50%)", fontSize: 12 }}>⭐</div>)}
-                </div>
-                <span style={{ fontSize: isWeekly ? 10 : 8, fontFamily: "'Nunito', sans-serif", marginTop: 4, color: isPeak ? "#E63946" : "#999", fontWeight: isPeak ? 700 : 400 }}>{dayLabel}</span>
-              </div>
-            );
-          })}
+          ); })}
         </div>
       </div>
       <div style={{ display: "flex", gap: 16, marginTop: 12, fontFamily: "'Nunito', sans-serif", fontSize: 10, color: "#999" }}>
@@ -797,59 +764,23 @@ function PeriodBarChart({ dates, sessions }) {
   );
 }
 
-// ─── Excel Export (reworked) ───
+// ─── Excel Export ───
 async function exportToExcel(sessions) {
   const XLSX = await import("xlsx");
-  const dayMap = {};
-  sessions.forEach(s => { dayMap[s.date] = (dayMap[s.date] || 0) + s.duration; });
-
-  // Sheet 1: Day-wise
-  const dailyData = Object.entries(dayMap).sort((a, b) => a[0].localeCompare(b[0])).map(([date, mins]) => ({
-    Date: date, Day: new Date(date + "T12:00:00").toLocaleDateString("en-US", { weekday: "long" }),
-    "Hours": +(mins / 60).toFixed(2), "Status": mins >= 120 ? "🔥" : "❌"
-  }));
-
-  // Sheet 2: Week-wise
-  const weekMap = {};
-  Object.entries(dayMap).forEach(([date, mins]) => {
-    const d = new Date(date + "T12:00:00");
-    const mon = new Date(d); mon.setDate(d.getDate() - ((d.getDay() + 6) % 7));
-    const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
-    const label = `${mon.toLocaleDateString("en-US", { month: "short", day: "numeric" })} - ${sun.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`;
-    weekMap[label] = (weekMap[label] || 0) + mins;
-  });
+  const dayMap = {}; sessions.forEach(s => { dayMap[s.date] = (dayMap[s.date] || 0) + s.duration; });
+  const dailyData = Object.entries(dayMap).sort((a, b) => a[0].localeCompare(b[0])).map(([date, mins]) => ({ Date: date, Day: new Date(date + "T12:00:00").toLocaleDateString("en-US", { weekday: "long" }), "Hours": +(mins / 60).toFixed(2), "Status": mins >= 120 ? "🔥" : "❌" }));
+  const weekMap = {}; Object.entries(dayMap).forEach(([date, mins]) => { const d = new Date(date + "T12:00:00"); const mon = new Date(d); mon.setDate(d.getDate() - ((d.getDay() + 6) % 7)); const sun = new Date(mon); sun.setDate(mon.getDate() + 6); const label = `${mon.toLocaleDateString("en-US", { month: "short", day: "numeric" })} - ${sun.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`; weekMap[label] = (weekMap[label] || 0) + mins; });
   const weeklyData = Object.entries(weekMap).map(([week, mins]) => ({ Week: week, "Hours": +(mins / 60).toFixed(2) }));
-
-  // Sheet 3: Month-wise
-  const monthMap = {};
-  Object.entries(dayMap).forEach(([date, mins]) => {
-    const key = date.slice(0, 7);
-    monthMap[key] = (monthMap[key] || 0) + mins;
-  });
-  const monthlyData = Object.entries(monthMap).sort((a, b) => a[0].localeCompare(b[0])).map(([key, mins]) => {
-    const [y, m] = key.split("-");
-    return { Month: new Date(parseInt(y), parseInt(m) - 1).toLocaleDateString("en-US", { month: "long", year: "numeric" }), "Hours": +(mins / 60).toFixed(2) };
-  });
-
-  // Sheet 4: Topic-wise
-  const tagMap = {}; const tagFirstDate = {};
-  sessions.forEach(s => {
-    tagMap[s.tag] = (tagMap[s.tag] || 0) + s.duration;
-    if (!tagFirstDate[s.tag] || s.date < tagFirstDate[s.tag]) tagFirstDate[s.tag] = s.date;
-  });
-  const topicData = Object.entries(tagMap).sort((a, b) => b[1] - a[1]).map(([tag, mins]) => ({
-    Topic: tag, "Hours": +(mins / 60).toFixed(2), "Started": tagFirstDate[tag] || ""
-  }));
-
+  const monthMap = {}; Object.entries(dayMap).forEach(([date, mins]) => { const key = date.slice(0, 7); monthMap[key] = (monthMap[key] || 0) + mins; });
+  const monthlyData = Object.entries(monthMap).sort((a, b) => a[0].localeCompare(b[0])).map(([key, mins]) => { const [y, m] = key.split("-"); return { Month: new Date(parseInt(y), parseInt(m) - 1).toLocaleDateString("en-US", { month: "long", year: "numeric" }), "Hours": +(mins / 60).toFixed(2) }; });
+  const tagMap = {}; const tagFirstDate = {}; sessions.forEach(s => { tagMap[s.tag] = (tagMap[s.tag] || 0) + s.duration; if (!tagFirstDate[s.tag] || s.date < tagFirstDate[s.tag]) tagFirstDate[s.tag] = s.date; });
+  const topicData = Object.entries(tagMap).sort((a, b) => b[1] - a[1]).map(([tag, mins]) => ({ Topic: tag, "Hours": +(mins / 60).toFixed(2), "Started": tagFirstDate[tag] || "" }));
   const wb = XLSX.utils.book_new();
   const ws1 = XLSX.utils.json_to_sheet(dailyData); ws1["!cols"] = [{ wch: 12 }, { wch: 12 }, { wch: 8 }, { wch: 6 }];
   const ws2 = XLSX.utils.json_to_sheet(weeklyData); ws2["!cols"] = [{ wch: 30 }, { wch: 10 }];
   const ws3 = XLSX.utils.json_to_sheet(monthlyData); ws3["!cols"] = [{ wch: 20 }, { wch: 10 }];
   const ws4 = XLSX.utils.json_to_sheet(topicData); ws4["!cols"] = [{ wch: 20 }, { wch: 10 }, { wch: 12 }];
-  XLSX.utils.book_append_sheet(wb, ws1, "Day-wise");
-  XLSX.utils.book_append_sheet(wb, ws2, "Week-wise");
-  XLSX.utils.book_append_sheet(wb, ws3, "Month-wise");
-  XLSX.utils.book_append_sheet(wb, ws4, "Topic-wise");
+  XLSX.utils.book_append_sheet(wb, ws1, "Day-wise"); XLSX.utils.book_append_sheet(wb, ws2, "Week-wise"); XLSX.utils.book_append_sheet(wb, ws3, "Month-wise"); XLSX.utils.book_append_sheet(wb, ws4, "Topic-wise");
   XLSX.writeFile(wb, `FocusMaxing_Export_${todayStr()}.xlsx`);
 }
 
@@ -894,7 +825,6 @@ function AnalysisPage({ sessions }) {
   const navBtn = { border: "none", background: "none", fontSize: 20, cursor: "pointer" };
   const tH = { fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", fontFamily: font };
   const tR = { display: "grid", padding: "9px 0", borderBottom: "1px solid #f0f0f0", fontFamily: font, fontSize: 13, alignItems: "center" };
-
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 16 }}>
@@ -911,17 +841,9 @@ function AnalysisPage({ sessions }) {
         <div style={{ fontSize: 11, fontFamily: font, textTransform: "uppercase", letterSpacing: "0.15em", color: "#999", marginTop: 4, fontWeight: 600 }}>Total Upskilling {totalMins >= 120 && "🔥"}</div>
       </div>
       {sorted.length === 0 ? (<div style={{ textAlign: "center", color: "#ccc", fontFamily: font, fontSize: 13, padding: "30px 0" }}>No sessions recorded</div>) : (<TagBarChart sorted={sorted} allTags={allTags} />)}
-      {daySessions.length > 0 && (
-        <div style={{ marginTop: 24 }}>
-          <div style={{ fontSize: 10, fontFamily: font, textTransform: "uppercase", letterSpacing: "0.12em", color: "#bbb", marginBottom: 8, fontWeight: 600 }}>Session Log</div>
-          {daySessions.map(s => (<div key={s.id} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: "1px solid #f5f5f5", fontFamily: font, fontSize: 13 }}><span style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: getTagColor(s.tag, allTags), display: "inline-block" }} />{s.tag}</span><span style={{ color: "#999" }}>{formatHM(s.duration)}</span></div>))}
-        </div>
-      )}
+      {daySessions.length > 0 && (<div style={{ marginTop: 24 }}><div style={{ fontSize: 10, fontFamily: font, textTransform: "uppercase", letterSpacing: "0.12em", color: "#bbb", marginBottom: 8, fontWeight: 600 }}>Session Log</div>{daySessions.map(s => (<div key={s.id} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: "1px solid #f5f5f5", fontFamily: font, fontSize: 13 }}><span style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: getTagColor(s.tag, allTags), display: "inline-block" }} />{s.tag}</span><span style={{ color: "#999" }}>{formatHM(s.duration)}</span></div>))}</div>)}
       <div style={{ marginTop: 32, textAlign: "center" }}>
-        <button onClick={() => setShowReports(!showReports)} style={{ border: "2px solid #000", background: showReports ? "#000" : "transparent", color: showReports ? "#fff" : "#000", padding: "10px 24px", fontSize: 12, fontFamily: font, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 8 }}>
-          <span style={{ display: "inline-block", transition: "transform 0.3s ease", transform: showReports ? "rotate(180deg)" : "rotate(0deg)", fontSize: 10 }}>▼</span>
-          {showReports ? "Hide Reports" : "Weekly & Monthly Reports"}
-        </button>
+        <button onClick={() => setShowReports(!showReports)} style={{ border: "2px solid #000", background: showReports ? "#000" : "transparent", color: showReports ? "#fff" : "#000", padding: "10px 24px", fontSize: 12, fontFamily: font, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 8 }}><span style={{ display: "inline-block", transition: "transform 0.3s ease", transform: showReports ? "rotate(180deg)" : "rotate(0deg)", fontSize: 10 }}>▼</span>{showReports ? "Hide Reports" : "Weekly & Monthly Reports"}</button>
       </div>
       <div style={{ maxHeight: showReports ? (reportsRef.current ? reportsRef.current.scrollHeight + "px" : "2000px") : "0px", overflow: "hidden", transition: "max-height 0.5s ease, opacity 0.4s ease", opacity: showReports ? 1 : 0 }}>
         <div ref={reportsRef}>
@@ -929,48 +851,28 @@ function AnalysisPage({ sessions }) {
           <PeriodBarChart dates={weekDates} sessions={sessions} />
           <div style={{ marginTop: 40, marginBottom: 14, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <div style={{ fontSize: 11, fontFamily: font, textTransform: "uppercase", letterSpacing: "0.15em", color: "#999", fontWeight: 600 }}>Monthly Report</div>
-            <div style={{ display: "flex", alignItems: "center", gap: 12, fontFamily: font }}>
-              <button onClick={() => shiftMonth(-1)} style={{ ...navBtn, fontSize: 16 }}>←</button>
-              <span style={{ fontSize: 13, fontWeight: 700 }}>{monthLabel}</span>
-              <button onClick={() => shiftMonth(1)} style={{ ...navBtn, fontSize: 16 }}>→</button>
-            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, fontFamily: font }}><button onClick={() => shiftMonth(-1)} style={{ ...navBtn, fontSize: 16 }}>←</button><span style={{ fontSize: 13, fontWeight: 700 }}>{monthLabel}</span><button onClick={() => shiftMonth(1)} style={{ ...navBtn, fontSize: 16 }}>→</button></div>
           </div>
           <PeriodBarChart dates={monthDates} sessions={sessions} />
         </div>
       </div>
-      {personalBests.length > 0 && (<>
-        <SectionHeader>🏆 Personal Bests</SectionHeader>
-        <div style={{ ...tR, borderBottom: "2px solid #000", padding: "0 0 6px", gridTemplateColumns: "1fr 100px 80px" }}><span style={tH}>Category</span><span style={{ ...tH, textAlign: "right" }}>Best</span><span style={{ ...tH, textAlign: "right" }}>Date</span></div>
-        {personalBests.map((b, i) => (<div key={b.tag} style={{ ...tR, gridTemplateColumns: "1fr 100px 80px" }}><span style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: getTagColor(b.tag, allTags), display: "inline-block" }} /><span style={{ fontWeight: 600 }}>{b.tag}</span>{i === 0 && <span style={{ fontSize: 11 }}>👑</span>}</span><span style={{ textAlign: "right", fontWeight: 700, color: "#2A9D8F" }}>{formatHM(b.mins)}</span><span style={{ textAlign: "right", color: "#999", fontSize: 11 }}>{b.date ? new Date(b.date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "—"}</span></div>))}
-      </>)}
+      {personalBests.length > 0 && (<><SectionHeader>🏆 Personal Bests</SectionHeader><div style={{ ...tR, borderBottom: "2px solid #000", padding: "0 0 6px", gridTemplateColumns: "1fr 100px 80px" }}><span style={tH}>Category</span><span style={{ ...tH, textAlign: "right" }}>Best</span><span style={{ ...tH, textAlign: "right" }}>Date</span></div>{personalBests.map((b, i) => (<div key={b.tag} style={{ ...tR, gridTemplateColumns: "1fr 100px 80px" }}><span style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: getTagColor(b.tag, allTags), display: "inline-block" }} /><span style={{ fontWeight: 600 }}>{b.tag}</span>{i === 0 && <span style={{ fontSize: 11 }}>👑</span>}</span><span style={{ textAlign: "right", fontWeight: 700, color: "#2A9D8F" }}>{formatHM(b.mins)}</span><span style={{ textAlign: "right", color: "#999", fontSize: 11 }}>{b.date ? new Date(b.date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "—"}</span></div>))}</>)}
       <div style={{ marginTop: 32, textAlign: "center" }}>
-        <button onClick={() => setShowAdvanced(!showAdvanced)} style={{ border: "2px solid #000", background: showAdvanced ? "#000" : "transparent", color: showAdvanced ? "#fff" : "#000", padding: "10px 24px", fontSize: 12, fontFamily: font, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 8 }}>
-          <span style={{ display: "inline-block", transition: "transform 0.3s ease", transform: showAdvanced ? "rotate(180deg)" : "rotate(0deg)", fontSize: 10 }}>▼</span>
-          {showAdvanced ? "Hide Advanced" : "Advanced Analysis"}
-        </button>
+        <button onClick={() => setShowAdvanced(!showAdvanced)} style={{ border: "2px solid #000", background: showAdvanced ? "#000" : "transparent", color: showAdvanced ? "#fff" : "#000", padding: "10px 24px", fontSize: 12, fontFamily: font, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 8 }}><span style={{ display: "inline-block", transition: "transform 0.3s ease", transform: showAdvanced ? "rotate(180deg)" : "rotate(0deg)", fontSize: 10 }}>▼</span>{showAdvanced ? "Hide Advanced" : "Advanced Analysis"}</button>
       </div>
       <div style={{ maxHeight: showAdvanced ? (advancedRef.current ? advancedRef.current.scrollHeight + "px" : "3000px") : "0px", overflow: "hidden", transition: "max-height 0.5s ease, opacity 0.4s ease", opacity: showAdvanced ? 1 : 0 }}>
         <div ref={advancedRef}>
           <SectionHeader>Distribution — Hours vs Days</SectionHeader>
-          <div style={{ overflowX: "auto", paddingBottom: 8 }}>
-            <div style={{ display: "flex", alignItems: "flex-end", gap: 6, minWidth: bucketCounts.length * 56, height: 160, paddingTop: 16 }}>
-              {bucketCounts.map((c, i) => { const h = maxBucket > 0 ? (c.count / maxBucket) * 120 : 0; return (<div key={c.label} style={{ flex: 1, minWidth: 44, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", height: 160 }}><span style={{ fontSize: 11, fontFamily: font, fontWeight: 700, marginBottom: 4, color: distColors[i] }}>{c.count > 0 ? c.count : ""}</span><div style={{ width: "100%", height: h, background: distColors[i], borderRadius: "4px 4px 0 0", transition: "height 0.4s ease", minHeight: c.count > 0 ? 6 : 2, opacity: 0.8 }} /><span style={{ fontSize: 9, fontFamily: font, marginTop: 6, color: "#999" }}>{c.label}</span></div>); })}
-            </div>
-          </div>
+          <div style={{ overflowX: "auto", paddingBottom: 8 }}><div style={{ display: "flex", alignItems: "flex-end", gap: 6, minWidth: bucketCounts.length * 56, height: 160, paddingTop: 16 }}>{bucketCounts.map((c, i) => { const h = maxBucket > 0 ? (c.count / maxBucket) * 120 : 0; return (<div key={c.label} style={{ flex: 1, minWidth: 44, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", height: 160 }}><span style={{ fontSize: 11, fontFamily: font, fontWeight: 700, marginBottom: 4, color: distColors[i] }}>{c.count > 0 ? c.count : ""}</span><div style={{ width: "100%", height: h, background: distColors[i], borderRadius: "4px 4px 0 0", transition: "height 0.4s ease", minHeight: c.count > 0 ? 6 : 2, opacity: 0.8 }} /><span style={{ fontSize: 9, fontFamily: font, marginTop: 6, color: "#999" }}>{c.label}</span></div>); })}</div></div>
           <SectionHeader>Focus Insights</SectionHeader>
-          {sessions.length > 0 && (<>
-            <div style={{ ...tR, borderBottom: "2px solid #000", padding: "0 0 6px", gridTemplateColumns: "1fr 130px 70px" }}><span style={tH}>Insight</span><span style={{ ...tH, textAlign: "right" }}>Value</span><span style={{ ...tH, textAlign: "right" }}>Count</span></div>
-            <div style={{ ...tR, gridTemplateColumns: "1fr 130px 70px" }}><div><div style={{ fontWeight: 600 }}>Comfort Zone</div><div style={{ fontSize: 10, color: "#999", marginTop: 2 }}>Most consistent range</div></div><span style={{ textAlign: "right", fontWeight: 700, color: "#6A4C93" }}>{bestZone && bestZone.count > 0 ? bestZone.label : "—"}</span><span style={{ textAlign: "right", color: "#666" }}>{bestZone && bestZone.count > 0 ? `${bestZone.count} days` : "—"}</span></div>
-            <div style={{ ...tR, gridTemplateColumns: "1fr 130px 70px" }}><div><div style={{ fontWeight: 600 }}>Best Focus Day</div><div style={{ fontSize: 10, color: "#999", marginTop: 2 }}>Day you study most often</div></div><span style={{ textAlign: "right", fontWeight: 700, color: "#2A9D8F" }}>{bestDow && bestDow.count > 0 ? dowNames[bestDow.dow] : "—"}</span><span style={{ textAlign: "right", color: "#666" }}>{bestDow && bestDow.count > 0 ? `${bestDow.count} days` : "—"}</span></div>
-            <div style={{ ...tR, gridTemplateColumns: "1fr 130px 70px" }}><div><div style={{ fontWeight: 600 }}>Peak Time Window</div><div style={{ fontSize: 10, color: "#999", marginTop: 2 }}>When you focus most</div></div><span style={{ textAlign: "right", fontWeight: 700, color: "#457B9D" }}>{bestWindow ? bestWindow.label : "—"}</span><span style={{ textAlign: "right", color: "#666" }}>{bestWindow ? `${bestWindow.count} days` : "—"}</span></div>
-          </>)}
+          {sessions.length > 0 && (<><div style={{ ...tR, borderBottom: "2px solid #000", padding: "0 0 6px", gridTemplateColumns: "1fr 130px 70px" }}><span style={tH}>Insight</span><span style={{ ...tH, textAlign: "right" }}>Value</span><span style={{ ...tH, textAlign: "right" }}>Count</span></div><div style={{ ...tR, gridTemplateColumns: "1fr 130px 70px" }}><div><div style={{ fontWeight: 600 }}>Comfort Zone</div><div style={{ fontSize: 10, color: "#999", marginTop: 2 }}>Most consistent range</div></div><span style={{ textAlign: "right", fontWeight: 700, color: "#6A4C93" }}>{bestZone && bestZone.count > 0 ? bestZone.label : "—"}</span><span style={{ textAlign: "right", color: "#666" }}>{bestZone && bestZone.count > 0 ? `${bestZone.count} days` : "—"}</span></div><div style={{ ...tR, gridTemplateColumns: "1fr 130px 70px" }}><div><div style={{ fontWeight: 600 }}>Best Focus Day</div><div style={{ fontSize: 10, color: "#999", marginTop: 2 }}>Day you study most often</div></div><span style={{ textAlign: "right", fontWeight: 700, color: "#2A9D8F" }}>{bestDow && bestDow.count > 0 ? dowNames[bestDow.dow] : "—"}</span><span style={{ textAlign: "right", color: "#666" }}>{bestDow && bestDow.count > 0 ? `${bestDow.count} days` : "—"}</span></div><div style={{ ...tR, gridTemplateColumns: "1fr 130px 70px" }}><div><div style={{ fontWeight: 600 }}>Peak Time Window</div><div style={{ fontSize: 10, color: "#999", marginTop: 2 }}>When you focus most</div></div><span style={{ textAlign: "right", fontWeight: 700, color: "#457B9D" }}>{bestWindow ? bestWindow.label : "—"}</span><span style={{ textAlign: "right", color: "#666" }}>{bestWindow ? `${bestWindow.count} days` : "—"}</span></div></>)}
         </div>
       </div>
     </div>
   );
 }
 
-// ─── Calendar Page (with ❌) ───
+// ─── Calendar Page (COMPACT) ───
 function CalendarPage({ sessions }) {
   const [viewDate, setViewDate] = useState(new Date());
   const fireDays = getFireDays(sessions);
@@ -985,38 +887,40 @@ function CalendarPage({ sessions }) {
   let monthFireCount = 0;
   for (let d = 1; d <= daysInMonth; d++) { const key = `${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`; if (fireDays.has(key)) monthFireCount++; }
   return (
-    <div>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 24, marginBottom: 8, fontFamily: "'Nunito', sans-serif" }}>
-        <button onClick={() => shiftMonth(-1)} style={{ border: "none", background: "none", fontSize: 20, cursor: "pointer" }}>←</button>
-        <span style={{ fontSize: 16, fontWeight: 700, minWidth: 200, textAlign: "center" }}>{monthName}</span>
-        <button onClick={() => shiftMonth(1)} style={{ border: "none", background: "none", fontSize: 20, cursor: "pointer" }}>→</button>
+    <div style={{ maxWidth: 360, margin: "0 auto" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 20, marginBottom: 6, fontFamily: "'Nunito', sans-serif" }}>
+        <button onClick={() => shiftMonth(-1)} style={{ border: "none", background: "none", fontSize: 18, cursor: "pointer" }}>←</button>
+        <span style={{ fontSize: 14, fontWeight: 700, minWidth: 160, textAlign: "center" }}>{monthName}</span>
+        <button onClick={() => shiftMonth(1)} style={{ border: "none", background: "none", fontSize: 18, cursor: "pointer" }}>→</button>
       </div>
-      <div style={{ textAlign: "center", fontFamily: "'Nunito', sans-serif", fontSize: 12, color: "#999", marginBottom: 24 }}>{monthFireCount} fire {monthFireCount === 1 ? "day" : "days"} this month</div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4, marginBottom: 4, fontFamily: "'Nunito', sans-serif" }}>
-        {["S", "M", "T", "W", "T", "F", "S"].map((d, i) => (<div key={i} style={{ textAlign: "center", fontSize: 11, color: "#bbb", fontWeight: 600, padding: "4px 0", letterSpacing: "0.1em" }}>{d}</div>))}
+      <div style={{ textAlign: "center", fontFamily: "'Nunito', sans-serif", fontSize: 11, color: "#999", marginBottom: 14 }}>{monthFireCount} fire {monthFireCount === 1 ? "day" : "days"} this month</div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 2, marginBottom: 2, fontFamily: "'Nunito', sans-serif" }}>
+        {["S", "M", "T", "W", "T", "F", "S"].map((d, i) => (<div key={i} style={{ textAlign: "center", fontSize: 9, color: "#bbb", fontWeight: 600, padding: "2px 0", letterSpacing: "0.1em" }}>{d}</div>))}
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4, fontFamily: "'Nunito', sans-serif" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 2, fontFamily: "'Nunito', sans-serif" }}>
         {cells.map((day, i) => {
           if (day === null) return <div key={`e${i}`} />;
           const key = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
           const isFire = fireDays.has(key);
           const isToday = isCurrentMonth && day === today.getDate();
           const isMissed = isPastDate(key) && !isFire;
+          const size = 36;
           return (
             <div key={i} style={{
-              aspectRatio: "1", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+              width: size, height: size, margin: "0 auto",
+              display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
               background: isFire ? "#000" : isMissed ? "#fff5f5" : isToday ? "#f5f5f5" : "transparent",
               color: isFire ? "#fff" : isMissed ? "#E63946" : "#000",
-              fontSize: 14, fontWeight: isToday ? 800 : 500, borderRadius: 0, transition: "all 0.2s"
+              fontSize: 12, fontWeight: isToday ? 800 : 500, borderRadius: 4, transition: "all 0.2s"
             }}>
-              {isFire && <span style={{ fontSize: 16, lineHeight: 1 }}>🔥</span>}
-              {isMissed && <span style={{ fontSize: 12, lineHeight: 1 }}>❌</span>}
-              <span style={{ fontSize: isFire || isMissed ? 10 : 14, lineHeight: 1, marginTop: isFire || isMissed ? 1 : 0 }}>{day}</span>
+              {isFire && <span style={{ fontSize: 12, lineHeight: 1 }}>🔥</span>}
+              {isMissed && <span style={{ fontSize: 9, lineHeight: 1 }}>❌</span>}
+              <span style={{ fontSize: isFire || isMissed ? 8 : 12, lineHeight: 1, marginTop: isFire || isMissed ? 0 : 0 }}>{day}</span>
             </div>
           );
         })}
       </div>
-      <div style={{ marginTop: 32, display: "flex", justifyContent: "center", gap: 24, fontFamily: "'Nunito', sans-serif", fontSize: 12, color: "#999" }}>
+      <div style={{ marginTop: 20, display: "flex", justifyContent: "center", gap: 20, fontFamily: "'Nunito', sans-serif", fontSize: 10, color: "#999" }}>
         <span>🔥 = 2h+</span><span>❌ = missed</span>
       </div>
     </div>
@@ -1059,11 +963,7 @@ function ReflectionPage({ sessions }) {
           <div key={date} onClick={() => { if (!isEditing) startEdit(date); }} style={{ display: "grid", gridTemplateColumns: "90px 1fr 70px", gap: 0, padding: "10px 0", borderBottom: `1px solid ${rowBorder}`, fontFamily: "'Nunito', sans-serif", fontSize: 13, background: rowBg, cursor: isEditing ? "default" : "pointer", marginLeft: -8, marginRight: -8, paddingLeft: 8, paddingRight: 8, borderRadius: 2 }}>
             <div style={{ display: "flex", flexDirection: "column", justifyContent: "center" }}><span style={{ fontWeight: 700, fontSize: 12 }}>{dayLabel}</span><span style={{ fontSize: 10, color: "#999" }}>{dateLabel}</span></div>
             <div style={{ display: "flex", alignItems: "center", paddingRight: 8 }}>
-              {isEditing ? (
-                <div style={{ display: "flex", gap: 6, width: "100%", alignItems: "center" }}>
-                  <input value={editText} onChange={e => setEditText(e.target.value)} autoFocus placeholder="How was your study?" onKeyDown={e => { if (e.key === "Enter") saveRow(date); if (e.key === "Escape") setEditingKey(null); }} style={{ flex: 1, border: "none", borderBottom: "2px solid #000", background: "transparent", fontSize: 13, fontFamily: "inherit", padding: "4px 0", outline: "none" }} />
-                  <button onClick={(e) => { e.stopPropagation(); saveRow(date); }} style={{ border: "2px solid #000", background: "#000", color: "#fff", padding: "4px 10px", fontSize: 10, fontFamily: "inherit", fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>Save</button>
-                </div>
+              {isEditing ? (<div style={{ display: "flex", gap: 6, width: "100%", alignItems: "center" }}><input value={editText} onChange={e => setEditText(e.target.value)} autoFocus placeholder="How was your study?" onKeyDown={e => { if (e.key === "Enter") saveRow(date); if (e.key === "Escape") setEditingKey(null); }} style={{ flex: 1, border: "none", borderBottom: "2px solid #000", background: "transparent", fontSize: 13, fontFamily: "inherit", padding: "4px 0", outline: "none" }} /><button onClick={(e) => { e.stopPropagation(); saveRow(date); }} style={{ border: "2px solid #000", background: "#000", color: "#fff", padding: "4px 10px", fontSize: 10, fontFamily: "inherit", fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>Save</button></div>
               ) : (<span style={{ color: r.note ? "#000" : "#ccc", fontSize: 13 }}>{r.note || (isToday ? "Click to add today's reflection..." : "—")}</span>)}
             </div>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end" }}>
@@ -1083,159 +983,58 @@ function ReflectionPage({ sessions }) {
   );
 }
 
-// ═══════════════════════════════════════════
 // ─── Sleep Page ───
-// ═══════════════════════════════════════════
 function SleepPage({ sleepLogs, setSleepLogs }) {
   const [sleepStart, setSleepStart] = useState("23:00");
   const [wakeUp, setWakeUp] = useState("06:30");
   const [logDate, setLogDate] = useState(todayStr());
   const font = "'Nunito', sans-serif";
-
-  const calcSleepMins = (start, wake) => {
-    const [sh, sm] = start.split(":").map(Number);
-    const [wh, wm] = wake.split(":").map(Number);
-    let startMin = sh * 60 + sm;
-    let wakeMin = wh * 60 + wm;
-    if (wakeMin <= startMin) wakeMin += 1440; // next day
-    return wakeMin - startMin;
-  };
-
-  const logSleep = async () => {
-    const totalMins = calcSleepMins(sleepStart, wakeUp);
-    const saved = await upsertSleepLog(logDate, sleepStart, wakeUp, totalMins);
-    if (saved) {
-      setSleepLogs(prev => {
-        const filtered = prev.filter(l => l.date !== logDate);
-        return [saved, ...filtered].sort((a, b) => b.date.localeCompare(a.date));
-      });
-    }
-  };
-
-  const sleepColor = (mins) => {
-    if (mins < 360) return "#F4A261"; // <6h orange
-    if (mins <= 450) return "#2A9D8F"; // 6-7.5h green
-    return "#E63946"; // >7.5h red (oversleep)
-  };
-
-  // Bar chart data (last 14 days)
-  const last14 = [];
-  for (let i = 13; i >= 0; i--) {
-    const d = new Date(); d.setDate(d.getDate() - i);
-    last14.push(d.toISOString().slice(0, 10));
-  }
-  const logMap = {};
-  sleepLogs.forEach(l => { logMap[l.date] = l; });
+  const calcSleepMins = (start, wake) => { const [sh, sm] = start.split(":").map(Number); const [wh, wm] = wake.split(":").map(Number); let startMin = sh * 60 + sm; let wakeMin = wh * 60 + wm; if (wakeMin <= startMin) wakeMin += 1440; return wakeMin - startMin; };
+  const logSleep = async () => { const totalMins = calcSleepMins(sleepStart, wakeUp); const saved = await upsertSleepLog(logDate, sleepStart, wakeUp, totalMins); if (saved) { setSleepLogs(prev => { const filtered = prev.filter(l => l.date !== logDate); return [saved, ...filtered].sort((a, b) => b.date.localeCompare(a.date)); }); } };
+  const sleepColor = (mins) => { if (mins < 360) return "#F4A261"; if (mins <= 450) return "#2A9D8F"; return "#E63946"; };
+  const last14 = []; for (let i = 13; i >= 0; i--) { const d = new Date(); d.setDate(d.getDate() - i); last14.push(d.toISOString().slice(0, 10)); }
+  const logMap = {}; sleepLogs.forEach(l => { logMap[l.date] = l; });
   const barData = last14.map(d => ({ date: d, mins: logMap[d]?.total_mins || 0 }));
   const maxSleep = Math.max(...barData.map(d => d.mins), 1);
   const barH = 120;
-
-  // Weekly avg (last 7 days with data)
   const recent7 = sleepLogs.slice(0, 7);
   const avgSleep = recent7.length > 0 ? Math.round(recent7.reduce((a, l) => a + (l.total_mins || 0), 0) / recent7.length) : 0;
   const avgBed = recent7.length > 0 ? recent7.map(l => l.sleep_start || "23:00").sort()[Math.floor(recent7.length / 2)] : "—";
   const avgWake = recent7.length > 0 ? recent7.map(l => l.wake_up || "07:00").sort()[Math.floor(recent7.length / 2)] : "—";
-
-  // Monthly avg
   const thisMonth = todayStr().slice(0, 7);
   const monthLogs = sleepLogs.filter(l => l.date.startsWith(thisMonth));
   const monthAvg = monthLogs.length > 0 ? Math.round(monthLogs.reduce((a, l) => a + (l.total_mins || 0), 0) / monthLogs.length) : 0;
-
-  const navBtn = { border: "none", background: "none", fontSize: 20, cursor: "pointer" };
-
   return (
     <div>
-      {/* Log sleep */}
       <div style={{ fontSize: 11, fontFamily: font, textTransform: "uppercase", letterSpacing: "0.15em", color: "#999", marginBottom: 14, fontWeight: 600 }}>Log Sleep</div>
       <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 24 }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <label style={{ fontSize: 10, fontFamily: font, color: "#999", fontWeight: 600 }}>DATE</label>
-          <input type="date" value={logDate} onChange={e => setLogDate(e.target.value)} style={{ border: "2px solid #000", padding: "8px 10px", fontSize: 13, fontFamily: font, fontWeight: 600, outline: "none" }} />
-        </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <label style={{ fontSize: 10, fontFamily: font, color: "#999", fontWeight: 600 }}>SLEEP</label>
-          <input type="time" value={sleepStart} onChange={e => setSleepStart(e.target.value)} style={{ border: "2px solid #000", padding: "8px 10px", fontSize: 13, fontFamily: font, fontWeight: 600, outline: "none" }} />
-        </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <label style={{ fontSize: 10, fontFamily: font, color: "#999", fontWeight: 600 }}>WAKE UP</label>
-          <input type="time" value={wakeUp} onChange={e => setWakeUp(e.target.value)} style={{ border: "2px solid #000", padding: "8px 10px", fontSize: 13, fontFamily: font, fontWeight: 600, outline: "none" }} />
-        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}><label style={{ fontSize: 10, fontFamily: font, color: "#999", fontWeight: 600 }}>DATE</label><input type="date" value={logDate} onChange={e => setLogDate(e.target.value)} style={{ border: "2px solid #000", padding: "8px 10px", fontSize: 13, fontFamily: font, fontWeight: 600, outline: "none" }} /></div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}><label style={{ fontSize: 10, fontFamily: font, color: "#999", fontWeight: 600 }}>SLEEP</label><input type="time" value={sleepStart} onChange={e => setSleepStart(e.target.value)} style={{ border: "2px solid #000", padding: "8px 10px", fontSize: 13, fontFamily: font, fontWeight: 600, outline: "none" }} /></div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}><label style={{ fontSize: 10, fontFamily: font, color: "#999", fontWeight: 600 }}>WAKE UP</label><input type="time" value={wakeUp} onChange={e => setWakeUp(e.target.value)} style={{ border: "2px solid #000", padding: "8px 10px", fontSize: 13, fontFamily: font, fontWeight: 600, outline: "none" }} /></div>
         <button onClick={logSleep} style={{ padding: "10px 20px", border: "2px solid #000", background: "#000", color: "#fff", fontSize: 13, fontFamily: font, fontWeight: 700, cursor: "pointer", alignSelf: "flex-end" }}>Log</button>
       </div>
-
-      {/* Sleep bar chart */}
       <div style={{ fontSize: 11, fontFamily: font, textTransform: "uppercase", letterSpacing: "0.15em", color: "#999", marginBottom: 14, fontWeight: 600, marginTop: 32 }}>Last 14 Days</div>
-      <div style={{ overflowX: "auto", paddingBottom: 8 }}>
-        <div style={{ display: "flex", alignItems: "flex-end", gap: 4, minWidth: 14 * 36, height: barH + 40, paddingTop: 16 }}>
-          {barData.map(d => {
-            const h = d.mins > 0 ? (d.mins / maxSleep) * barH : 0;
-            const color = d.mins > 0 ? sleepColor(d.mins) : "#f0f0f0";
-            const dayLabel = new Date(d.date + "T12:00:00").getDate();
-            return (
-              <div key={d.date} style={{ flex: 1, minWidth: 24, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", height: barH + 40 }}>
-                {d.mins > 0 && <span style={{ fontSize: 9, fontFamily: font, fontWeight: 700, marginBottom: 2, color }}>{formatHM(d.mins)}</span>}
-                <div style={{ width: "100%", height: h, background: color, borderRadius: "3px 3px 0 0", minHeight: d.mins > 0 ? 4 : 2 }} />
-                <span style={{ fontSize: 8, fontFamily: font, marginTop: 3, color: "#999" }}>{dayLabel}</span>
-              </div>
-            );
-          })}
-        </div>
-      </div>
+      <div style={{ overflowX: "auto", paddingBottom: 8 }}><div style={{ display: "flex", alignItems: "flex-end", gap: 4, minWidth: 14 * 36, height: barH + 40, paddingTop: 16 }}>{barData.map(d => { const h = d.mins > 0 ? (d.mins / maxSleep) * barH : 0; const color = d.mins > 0 ? sleepColor(d.mins) : "#f0f0f0"; const dayLabel = new Date(d.date + "T12:00:00").getDate(); return (<div key={d.date} style={{ flex: 1, minWidth: 24, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", height: barH + 40 }}>{d.mins > 0 && <span style={{ fontSize: 9, fontFamily: font, fontWeight: 700, marginBottom: 2, color }}>{formatHM(d.mins)}</span>}<div style={{ width: "100%", height: h, background: color, borderRadius: "3px 3px 0 0", minHeight: d.mins > 0 ? 4 : 2 }} /><span style={{ fontSize: 8, fontFamily: font, marginTop: 3, color: "#999" }}>{dayLabel}</span></div>); })}</div></div>
       <div style={{ display: "flex", gap: 16, marginTop: 8, fontFamily: font, fontSize: 10, color: "#999" }}>
         <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 8, height: 8, background: "#F4A261", borderRadius: 2, display: "inline-block" }} /> &lt;6h</span>
         <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 8, height: 8, background: "#2A9D8F", borderRadius: 2, display: "inline-block" }} /> 6–7.5h</span>
         <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 8, height: 8, background: "#E63946", borderRadius: 2, display: "inline-block" }} /> 7.5h+</span>
       </div>
-
-      {/* Averages */}
       <div style={{ fontSize: 11, fontFamily: font, textTransform: "uppercase", letterSpacing: "0.15em", color: "#999", marginBottom: 14, fontWeight: 600, marginTop: 32 }}>Averages</div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 24 }}>
-        <div style={{ background: "#f8f8f8", padding: "16px", borderRadius: 8, fontFamily: font }}>
-          <div style={{ fontSize: 10, color: "#999", textTransform: "uppercase", letterSpacing: "0.1em", fontWeight: 600, marginBottom: 6 }}>Weekly (last 7)</div>
-          <div style={{ fontSize: 22, fontWeight: 700 }}>{formatHM(avgSleep)}</div>
-          <div style={{ fontSize: 11, color: "#666", marginTop: 6 }}>Bed: {avgBed}</div>
-          <div style={{ fontSize: 11, color: "#666" }}>Wake: {avgWake}</div>
-        </div>
-        <div style={{ background: "#f8f8f8", padding: "16px", borderRadius: 8, fontFamily: font }}>
-          <div style={{ fontSize: 10, color: "#999", textTransform: "uppercase", letterSpacing: "0.1em", fontWeight: 600, marginBottom: 6 }}>Monthly</div>
-          <div style={{ fontSize: 22, fontWeight: 700 }}>{formatHM(monthAvg)}</div>
-          <div style={{ fontSize: 11, color: "#666", marginTop: 6 }}>{monthLogs.length} nights logged</div>
-        </div>
+        <div style={{ background: "#f8f8f8", padding: "16px", borderRadius: 8, fontFamily: font }}><div style={{ fontSize: 10, color: "#999", textTransform: "uppercase", letterSpacing: "0.1em", fontWeight: 600, marginBottom: 6 }}>Weekly (last 7)</div><div style={{ fontSize: 22, fontWeight: 700 }}>{formatHM(avgSleep)}</div><div style={{ fontSize: 11, color: "#666", marginTop: 6 }}>Bed: {avgBed}</div><div style={{ fontSize: 11, color: "#666" }}>Wake: {avgWake}</div></div>
+        <div style={{ background: "#f8f8f8", padding: "16px", borderRadius: 8, fontFamily: font }}><div style={{ fontSize: 10, color: "#999", textTransform: "uppercase", letterSpacing: "0.1em", fontWeight: 600, marginBottom: 6 }}>Monthly</div><div style={{ fontSize: 22, fontWeight: 700 }}>{formatHM(monthAvg)}</div><div style={{ fontSize: 11, color: "#666", marginTop: 6 }}>{monthLogs.length} nights logged</div></div>
       </div>
-
-      {/* Sleep log table */}
       <div style={{ fontSize: 11, fontFamily: font, textTransform: "uppercase", letterSpacing: "0.15em", color: "#999", marginBottom: 10, fontWeight: 600 }}>Sleep Log</div>
       <div style={{ display: "grid", gridTemplateColumns: "90px 70px 70px 70px", gap: 0, fontFamily: font, borderBottom: "2px solid #000", paddingBottom: 6, marginBottom: 4 }}>
-        <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em" }}>Date</span>
-        <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em" }}>Sleep</span>
-        <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em" }}>Wake</span>
-        <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", textAlign: "right" }}>Total</span>
+        <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em" }}>Date</span><span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em" }}>Sleep</span><span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em" }}>Wake</span><span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", textAlign: "right" }}>Total</span>
       </div>
       {sleepLogs.length === 0 && (<div style={{ color: "#ccc", fontFamily: font, fontSize: 13, padding: "20px 0", textAlign: "center" }}>No sleep logs yet</div>)}
-      {sleepLogs.map(l => {
-        const color = sleepColor(l.total_mins || 0);
-        const dayLabel = new Date(l.date + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
-        return (
-          <div key={l.id} style={{ display: "grid", gridTemplateColumns: "90px 70px 70px 70px", padding: "8px 0", borderBottom: "1px solid #f0f0f0", fontFamily: font, fontSize: 13 }}>
-            <span style={{ fontWeight: 600, fontSize: 11 }}>{dayLabel}</span>
-            <span style={{ color: "#666" }}>{l.sleep_start || "—"}</span>
-            <span style={{ color: "#666" }}>{l.wake_up || "—"}</span>
-            <span style={{ textAlign: "right", fontWeight: 700, color }}>{l.total_mins ? formatHM(l.total_mins) : "—"}</span>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-// ─── Footer with Logout ───
-function Footer({ onLogout }) {
-  return (
-    <div style={{ marginTop: 48, padding: "14px 20px", borderRadius: 12, background: "#E8F4FD", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-      <span style={{ fontSize: 13, fontWeight: 600, color: "#4A5568", letterSpacing: "0.01em" }}>
-        Vibe coded by Nithin Chowdary <span style={{ color: "#E53E3E", fontSize: 15 }}>❤️</span>
-      </span>
-      <button onClick={onLogout} style={{ border: "1px solid #ccc", background: "#fff", cursor: "pointer", fontSize: 11, fontFamily: "'Nunito', sans-serif", fontWeight: 700, color: "#999", padding: "5px 14px", borderRadius: 20, letterSpacing: "0.04em", textTransform: "uppercase" }}>Logout</button>
+      {sleepLogs.map(l => { const color = sleepColor(l.total_mins || 0); const dayLabel = new Date(l.date + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }); return (
+        <div key={l.id} style={{ display: "grid", gridTemplateColumns: "90px 70px 70px 70px", padding: "8px 0", borderBottom: "1px solid #f0f0f0", fontFamily: font, fontSize: 13 }}>
+          <span style={{ fontWeight: 600, fontSize: 11 }}>{dayLabel}</span><span style={{ color: "#666" }}>{l.sleep_start || "—"}</span><span style={{ color: "#666" }}>{l.wake_up || "—"}</span><span style={{ textAlign: "right", fontWeight: 700, color }}>{l.total_mins ? formatHM(l.total_mins) : "—"}</span>
+        </div>
+      ); })}
     </div>
   );
 }
@@ -1251,6 +1050,7 @@ export default function App() {
   const [tasks, setTasks] = useState([]);
   const [sleepLogs, setSleepLogs] = useState([]);
   const [loaded, setLoaded] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => { setUser(session?.user ?? null); setAuthLoading(false); });
@@ -1264,7 +1064,7 @@ export default function App() {
     Promise.all([loadSessions(), loadTasks(), loadSleepLogs()]).then(([s, t, sl]) => { setSessions(s); setTasks(t); setSleepLogs(sl); setLoaded(true); });
   }, [user]);
 
-  const handleLogout = async () => { await supabase.auth.signOut(); setUser(null); setSessions([]); setTasks([]); setSleepLogs([]); setLoaded(false); };
+  const handleLogout = async () => { await supabase.auth.signOut(); setUser(null); setSessions([]); setTasks([]); setSleepLogs([]); setLoaded(false); setSidebarOpen(false); };
   const streak = calcStreak(sessions);
   const todayMins = sessions.filter(s => s.date === todayStr()).reduce((a, s) => a + s.duration, 0);
 
@@ -1273,20 +1073,17 @@ export default function App() {
   if (!loaded) return (<div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", fontFamily: "'Nunito', sans-serif", fontSize: 14, color: "#999" }}><link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet" />Loading your data...</div>);
 
   return (
-    <div style={{ maxWidth: 540, margin: "0 auto", padding: "120px 20px 60px", minHeight: "100vh", background: "#fff", color: "#000" }}>
+    <div style={{ maxWidth: 540, margin: "0 auto", padding: "60px 20px 60px", minHeight: "100vh", background: "#fff", color: "#000" }}>
       <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-      <StreakBadge streak={streak} todayMins={todayMins} />
-      <QuotesBanner />
-      <CountdownBanner sessions={sessions} />
-      <TopBar sessions={sessions} streak={streak} />
-      <Nav page={page} setPage={setPage} />
+      <TopNavBar sessions={sessions} streak={streak} todayMins={todayMins} onMenuClick={() => setSidebarOpen(true)} />
+      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} page={page} setPage={setPage} sessions={sessions} onLogout={handleLogout} />
+      <WeekStrip sessions={sessions} />
       {page === PAGES.TIMER && <TimerPage sessions={sessions} setSessions={setSessions} />}
       {page === PAGES.TASKS && <TasksPage tasks={tasks} setTasks={setTasks} />}
       {page === PAGES.ANALYSIS && <AnalysisPage sessions={sessions} />}
       {page === PAGES.CALENDAR && <CalendarPage sessions={sessions} />}
       {page === PAGES.REFLECTION && <ReflectionPage sessions={sessions} />}
       {page === PAGES.SLEEP && <SleepPage sleepLogs={sleepLogs} setSleepLogs={setSleepLogs} />}
-      <Footer onLogout={handleLogout} />
     </div>
   );
 }
