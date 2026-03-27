@@ -1293,7 +1293,7 @@ function ReflectionPage({ sessions }) {
                 </div>
               ) : (
                 <span style={{ color: r.note ? C.black : C.g300, fontSize: 13, fontWeight: r.note ? 500 : 400 }}>
-                  {r.note || (isToday ? 'Click to add today's reflection...' : '—')}
+                  {r.note || (isToday ? "Click to add today's reflection..." : '—')}
                 </span>
               )}
             </div>
