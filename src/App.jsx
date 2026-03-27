@@ -196,11 +196,11 @@ function CountdownBanner({ sessions }) {
   }
 
   return (
-    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontFamily: font, fontSize: 13, fontWeight: 700, marginBottom: 12 }}>
+    <div style={{ display: "flex", justifyContent: "space-around", alignItems: "center", fontFamily: font, fontSize: 20, fontWeight: 500, marginBottom: 12 }}>
       <span style={{ color: todayColor }}>📖 {formatHM(todayMins)} today</span>
       <span style={{ color: midColor }}>⏳ {hrsLeft}h {mLeft}m left</span>
       {editingTarget ? (
-        <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+        <span style={{ display: "flex", alignItems: "center", gap: 2 }}>
           <input type="date" value={tempTarget} onChange={e => setTempTarget(e.target.value)} style={{ border: "1px solid #ccc", padding: "4px 6px", fontSize: 11, fontFamily: font, outline: "none" }} />
           <button onClick={saveTarget} style={{ border: "none", background: "#000", color: "#fff", padding: "4px 8px", fontSize: 10, fontFamily: font, fontWeight: 700, cursor: "pointer", borderRadius: 4 }}>Set</button>
         </span>
