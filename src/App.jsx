@@ -390,33 +390,33 @@ function TopBar({ sessions, streak }) {
   const dayLabels = ["M", "T", "W", "TH", "F", "SA", "SU"];
 
   const pillStyle = {
-    display: "inline-flex", alignItems: "center", gap: 6,
+    display: "inline-flex", alignItems: "center", gap: 7,
     background: "#000", color: "#fff",
-    padding: "8px 16px", borderRadius: 40,
-    fontFamily: font, fontSize: 14, fontWeight: 700,
+    padding: "10px 18px", borderRadius: 40,
+    fontFamily: font, fontSize: 15, fontWeight: 700,
     letterSpacing: "0.02em",
     boxShadow: "0 2px 12px rgba(0,0,0,0.18)"
   };
-  const labelStyle = { fontWeight: 400, fontSize: 11, opacity: 0.6 };
+  const labelStyle = { fontWeight: 400, fontSize: 12, opacity: 0.6 };
 
   return (
     <div style={{ marginBottom: 20 }}>
-      {/* All pills + streak in one row */}
-      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
-        <div style={pillStyle}><span>⚡</span><span>{formatHM(maxMins)}</span><span style={labelStyle}>max</span></div>
-        <div style={pillStyle}><span>📊</span><span>{formatHM(monthMins)}</span><span style={labelStyle}>{monthName}</span></div>
-        <div style={pillStyle}><span>📅</span><span>{formatHM(yearMins)}</span><span style={labelStyle}>{yearStr}</span></div>
-        <div style={{ marginLeft: "auto" }}>
-          <div style={{
-            ...pillStyle,
-            background: streak > 0 ? "#000" : "#e0e0e0",
-            color: streak > 0 ? "#fff" : "#999",
-            boxShadow: streak > 0 ? "0 2px 12px rgba(0,0,0,0.18)" : "none"
-          }}>
-            <span style={{ fontSize: 18 }}>{streak > 0 ? "🔥" : "○"}</span>
-            <span>{streak}</span>
-            <span style={labelStyle}>{streak === 1 ? "day" : "days"}</span>
-          </div>
+      {/* Top row: stat pills flush left, streak flush right */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <div style={pillStyle}><span>⚡</span><span>{formatHM(maxMins)}</span><span style={labelStyle}>max</span></div>
+          <div style={pillStyle}><span>📊</span><span>{formatHM(monthMins)}</span><span style={labelStyle}>{monthName}</span></div>
+          <div style={pillStyle}><span>📅</span><span>{formatHM(yearMins)}</span><span style={labelStyle}>{yearStr}</span></div>
+        </div>
+        <div style={{
+          ...pillStyle,
+          background: streak > 0 ? "#000" : "#e0e0e0",
+          color: streak > 0 ? "#fff" : "#999",
+          boxShadow: streak > 0 ? "0 2px 12px rgba(0,0,0,0.18)" : "none"
+        }}>
+          <span style={{ fontSize: 20 }}>{streak > 0 ? "🔥" : "○"}</span>
+          <span>{streak}</span>
+          <span style={labelStyle}>{streak === 1 ? "day" : "days"}</span>
         </div>
       </div>
       <div style={{ display: "flex", justifyContent: "space-between", gap: 4, fontFamily: font }}>
