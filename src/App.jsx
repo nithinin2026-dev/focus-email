@@ -270,6 +270,29 @@ function AuthPage({ onAuth }) {
   );
 }
 
+// ─── Streak Badge (fixed top-right) ───
+function StreakBadge({ streak }) {
+  return (
+    <div style={{
+      position: "fixed", top: 16, right: 20, zIndex: 999,
+      display: "flex", alignItems: "center", gap: 7,
+      background: streak > 0 ? "#000" : "#e0e0e0",
+      color: streak > 0 ? "#fff" : "#999",
+      padding: "10px 18px", borderRadius: 40,
+      fontFamily: "'Nunito', sans-serif", fontSize: 15, fontWeight: 700,
+      letterSpacing: "0.02em",
+      boxShadow: streak > 0 ? "0 2px 12px rgba(0,0,0,0.18)" : "none",
+      transition: "all 0.3s ease"
+    }}>
+      <span style={{ fontSize: 20 }}>{streak > 0 ? "🔥" : "○"}</span>
+      <span>{streak}</span>
+      <span style={{ fontWeight: 400, fontSize: 12, opacity: 0.6, marginLeft: 2 }}>
+        {streak === 1 ? "day" : "days"}
+      </span>
+    </div>
+  );
+}
+
 // ─── Nav (5 tabs) ───
 function Nav({ page, setPage }) {
   const items = [
@@ -329,9 +352,6 @@ function TopBar({ sessions, streak }) {
         <div style={{ ...pillStyle, flex: 1, justifyContent: "center" }}><span>⚡</span><span>{formatHM(maxMins)}</span><span style={labelStyle}>max</span></div>
         <div style={{ ...pillStyle, flex: 1, justifyContent: "center" }}><span>📊</span><span>{formatHM(monthMins)}</span><span style={labelStyle}>{monthName}</span></div>
         <div style={{ ...pillStyle, flex: 1, justifyContent: "center" }}><span>📅</span><span>{formatHM(yearMins)}</span><span style={labelStyle}>{yearStr}</span></div>
-        <div style={{ ...pillStyle, flex: 1, justifyContent: "center", background: streak > 0 ? "#000" : "#e0e0e0", color: streak > 0 ? "#fff" : "#999", boxShadow: streak > 0 ? "0 2px 12px rgba(0,0,0,0.18)" : "none" }}>
-          <span style={{ fontSize: 20 }}>{streak > 0 ? "🔥" : "○"}</span><span>{streak}</span><span style={labelStyle}>{streak === 1 ? "day" : "days"}</span>
-        </div>
       </div>
       {/* Week bar with weekly total pill */}
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -382,7 +402,7 @@ function TimerPage({ sessions, setSessions }) {
     return saved ? Number(saved) : 0;
   });
   const [mode, setMode] = useState(() => sessionStorage.getItem("sl_mode") || "focus");
-  const [focusMins, setFocusMins] = useState(() => Number(sessionStorage.getItem("sl_focusMins")) || 25);
+  const [focusMins, setFocusMins] = useState(() => Number(sessionStorage.getItem("sl_focusMins")) || 60);
   const [breakMins, setBreakMins] = useState(() => Number(sessionStorage.getItem("sl_breakMins")) || 5);
   const [editing, setEditing] = useState(false);
   const [tempFocus, setTempFocus] = useState("25");
@@ -1055,6 +1075,7 @@ export default function App() {
   return (
     <div style={{ maxWidth: 540, margin: "0 auto", padding: "40px 20px 60px", minHeight: "100vh", background: "#fff", color: "#000" }}>
       <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+      <StreakBadge streak={streak} />
       <QuotesBanner />
       <CountdownBanner />
       <TopBar sessions={sessions} streak={streak} />
