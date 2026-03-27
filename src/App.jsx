@@ -63,6 +63,10 @@ async function insertSession(session) {
   if (error) { console.error("Insert session error:", error); return null; }
   return data;
 }
+async function deleteSession(sessionId) {
+  const { error } = await supabase.from("sessions").delete().eq("id", sessionId);
+  if (error) console.error("Delete session error:", error);
+}
 async function loadReflections() {
   const { data, error } = await supabase.from("reflections").select("*");
   if (error) { console.error("Load reflections error:", error); return {}; }
@@ -786,7 +790,7 @@ async function exportToExcel(sessions) {
 }
 
 // ─── Analysis Page ───
-function AnalysisPage({ sessions }) {
+function AnalysisPage({ sessions, setSessions }) {
   const [selectedDate, setSelectedDate] = useState(todayStr());
   const [showReports, setShowReports] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -839,7 +843,7 @@ function AnalysisPage({ sessions }) {
         <div style={{ fontSize: 11, fontFamily: font, textTransform: "uppercase", letterSpacing: "0.15em", color: "#999", marginTop: 4, fontWeight: 600 }}>Total Upskilling {totalMins >= 120 && "🔥"}</div>
       </div>
       {sorted.length === 0 ? (<div style={{ textAlign: "center", color: "#ccc", fontFamily: font, fontSize: 13, padding: "30px 0" }}>No sessions recorded</div>) : (<TagBarChart sorted={sorted} allTags={allTags} />)}
-      {daySessions.length > 0 && (<div style={{ marginTop: 24 }}><div style={{ fontSize: 10, fontFamily: font, textTransform: "uppercase", letterSpacing: "0.12em", color: "#bbb", marginBottom: 8, fontWeight: 600 }}>Session Log</div>{daySessions.map(s => (<div key={s.id} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: "1px solid #f5f5f5", fontFamily: font, fontSize: 13 }}><span style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: getTagColor(s.tag, allTags), display: "inline-block" }} />{s.tag}</span><span style={{ color: "#999" }}>{formatHM(s.duration)}</span></div>))}</div>)}
+      {daySessions.length > 0 && (<div style={{ marginTop: 24 }}><div style={{ fontSize: 10, fontFamily: font, textTransform: "uppercase", letterSpacing: "0.12em", color: "#bbb", marginBottom: 8, fontWeight: 600 }}>Session Log</div>{daySessions.map(s => (<div key={s.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "7px 0", borderBottom: "1px solid #f5f5f5", fontFamily: font, fontSize: 13 }}><span style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: getTagColor(s.tag, allTags), display: "inline-block" }} />{s.tag}</span><span style={{ display: "flex", alignItems: "center", gap: 10 }}><span style={{ color: "#999" }}>{formatHM(s.duration)}</span><button onClick={async () => { await deleteSession(s.id); setSessions(prev => prev.filter(x => x.id !== s.id)); }} style={{ border: "none", background: "none", cursor: "pointer", color: "#ccc", fontSize: 16, padding: "0 2px", lineHeight: 1 }} title="Delete session">✕</button></span></div>))}</div>)}
       <div style={{ marginTop: 32, textAlign: "center" }}>
         <button onClick={() => setShowReports(!showReports)} style={{ border: "2px solid #000", background: showReports ? "#000" : "transparent", color: showReports ? "#fff" : "#000", padding: "10px 24px", fontSize: 12, fontFamily: font, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 8 }}><span style={{ display: "inline-block", transition: "transform 0.3s ease", transform: showReports ? "rotate(180deg)" : "rotate(0deg)", fontSize: 10 }}>▼</span>{showReports ? "Hide Reports" : "Weekly & Monthly Reports"}</button>
       </div>
@@ -873,11 +877,25 @@ function AnalysisPage({ sessions }) {
   );
 }
 
-// ─── Calendar Page (COMPACT) ───
+// ─── Calendar Page (COMPACT + Tag Filter) ───
 function CalendarPage({ sessions }) {
   const [viewDate, setViewDate] = useState(new Date());
-  const fireDays = getFireDays(sessions);
-  const dayTotals = getDayTotals(sessions);
+  const [selectedTag, setSelectedTag] = useState("__all__");
+  const font = "'Nunito', sans-serif";
+
+  const allTags = [...new Set(sessions.map(s => s.tag))].sort();
+
+  // Compute fire days based on selected tag
+  const fireDays = new Set();
+  const dayTotals = {};
+  if (selectedTag === "__all__") {
+    sessions.forEach(s => { dayTotals[s.date] = (dayTotals[s.date] || 0) + s.duration; });
+    Object.entries(dayTotals).forEach(([date, mins]) => { if (mins >= 120) fireDays.add(date); });
+  } else {
+    // Per-tag: fire if ANY session with that tag exists on that day
+    sessions.forEach(s => { if (s.tag === selectedTag) fireDays.add(s.date); });
+  }
+
   const year = viewDate.getFullYear(); const month = viewDate.getMonth();
   const firstDay = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -887,18 +905,35 @@ function CalendarPage({ sessions }) {
   const today = new Date(); const isCurrentMonth = year === today.getFullYear() && month === today.getMonth();
   let monthFireCount = 0;
   for (let d = 1; d <= daysInMonth; d++) { const key = `${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`; if (fireDays.has(key)) monthFireCount++; }
+
+  const isAllMode = selectedTag === "__all__";
+
   return (
-    <div style={{ maxWidth: 360, margin: "0 auto" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 20, marginBottom: 6, fontFamily: "'Nunito', sans-serif" }}>
+    <div style={{ maxWidth: 360, margin: "0 auto", paddingTop: 16 }}>
+      {/* Tag dropdown */}
+      <div style={{ display: "flex", justifyContent: "center", marginBottom: 16 }}>
+        <select value={selectedTag} onChange={e => setSelectedTag(e.target.value)} style={{
+          border: "2px solid #000", padding: "8px 14px", fontSize: 13, fontFamily: font,
+          fontWeight: 700, background: "#fff", outline: "none", cursor: "pointer",
+          borderRadius: 4, minWidth: 180, textAlign: "center"
+        }}>
+          <option value="__all__">All — 2h+ goal</option>
+          {allTags.map(tag => (<option key={tag} value={tag}>{tag}</option>))}
+        </select>
+      </div>
+
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 20, marginBottom: 6, fontFamily: font }}>
         <button onClick={() => shiftMonth(-1)} style={{ border: "none", background: "none", fontSize: 18, cursor: "pointer" }}>←</button>
         <span style={{ fontSize: 14, fontWeight: 700, minWidth: 160, textAlign: "center" }}>{monthName}</span>
         <button onClick={() => shiftMonth(1)} style={{ border: "none", background: "none", fontSize: 18, cursor: "pointer" }}>→</button>
       </div>
-      <div style={{ textAlign: "center", fontFamily: "'Nunito', sans-serif", fontSize: 11, color: "#999", marginBottom: 14 }}>{monthFireCount} fire {monthFireCount === 1 ? "day" : "days"} this month</div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 2, marginBottom: 2, fontFamily: "'Nunito', sans-serif" }}>
+      <div style={{ textAlign: "center", fontFamily: font, fontSize: 11, color: "#999", marginBottom: 14 }}>
+        {monthFireCount} {isAllMode ? "fire" : selectedTag} {monthFireCount === 1 ? "day" : "days"} this month
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 2, marginBottom: 2, fontFamily: font }}>
         {["S", "M", "T", "W", "T", "F", "S"].map((d, i) => (<div key={i} style={{ textAlign: "center", fontSize: 9, color: "#bbb", fontWeight: 600, padding: "2px 0", letterSpacing: "0.1em" }}>{d}</div>))}
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 2, fontFamily: "'Nunito', sans-serif" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 2, fontFamily: font }}>
         {cells.map((day, i) => {
           if (day === null) return <div key={`e${i}`} />;
           const key = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
@@ -916,13 +951,13 @@ function CalendarPage({ sessions }) {
             }}>
               {isFire && <span style={{ fontSize: 12, lineHeight: 1 }}>🔥</span>}
               {isMissed && <span style={{ fontSize: 9, lineHeight: 1 }}>❌</span>}
-              <span style={{ fontSize: isFire || isMissed ? 8 : 12, lineHeight: 1, marginTop: isFire || isMissed ? 0 : 0 }}>{day}</span>
+              <span style={{ fontSize: isFire || isMissed ? 8 : 12, lineHeight: 1 }}>{day}</span>
             </div>
           );
         })}
       </div>
-      <div style={{ marginTop: 20, display: "flex", justifyContent: "center", gap: 20, fontFamily: "'Nunito', sans-serif", fontSize: 10, color: "#999" }}>
-        <span>🔥 = 2h+</span><span>❌ = missed</span>
+      <div style={{ marginTop: 20, display: "flex", justifyContent: "center", gap: 20, fontFamily: font, fontSize: 10, color: "#999" }}>
+        <span>🔥 = {isAllMode ? "2h+" : "studied"}</span><span>❌ = missed</span>
       </div>
     </div>
   );
@@ -1079,11 +1114,11 @@ export default function App() {
       <TopNavBar sessions={sessions} streak={streak} todayMins={todayMins} onMenuClick={() => setSidebarOpen(true)} />
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} page={page} setPage={setPage} sessions={sessions} onLogout={handleLogout} />
       {page === PAGES.TIMER && <><WeekStrip sessions={sessions} /><TimerPage sessions={sessions} setSessions={setSessions} /></>}
-      {page === PAGES.TASKS && <TasksPage tasks={tasks} setTasks={setTasks} />}
-      {page === PAGES.ANALYSIS && <AnalysisPage sessions={sessions} />}
+      {page === PAGES.TASKS && <div style={{ paddingTop: 16 }}><TasksPage tasks={tasks} setTasks={setTasks} /></div>}
+      {page === PAGES.ANALYSIS && <div style={{ paddingTop: 16 }}><AnalysisPage sessions={sessions} setSessions={setSessions} /></div>}
       {page === PAGES.CALENDAR && <CalendarPage sessions={sessions} />}
-      {page === PAGES.REFLECTION && <ReflectionPage sessions={sessions} />}
-      {page === PAGES.SLEEP && <SleepPage sleepLogs={sleepLogs} setSleepLogs={setSleepLogs} />}
+      {page === PAGES.REFLECTION && <div style={{ paddingTop: 16 }}><ReflectionPage sessions={sessions} /></div>}
+      {page === PAGES.SLEEP && <div style={{ paddingTop: 16 }}><SleepPage sleepLogs={sleepLogs} setSleepLogs={setSleepLogs} /></div>}
     </div>
   );
 }
