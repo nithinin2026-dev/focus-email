@@ -691,29 +691,12 @@ export default function App() {
   const streak = calcStreak(sessions);
   const todayMins = sessions.filter(s => s.date === todayStr()).reduce((a, s) => a + s.duration, 0);
 
-  if (authLoading) return (
-    <>
-      <link href="https://cdn.jsdelivr.net/npm/tailwindcss@3.4.0/dist/tailwind.min.css" rel="stylesheet" />
-      <div className="flex items-center justify-center h-screen text-sm text-gray-500">Loading...</div>
-    </>
-  );
-  if (!user) return (
-    <>
-      <link href="https://cdn.jsdelivr.net/npm/tailwindcss@3.4.0/dist/tailwind.min.css" rel="stylesheet" />
-      <AuthPage onAuth={setUser} />
-    </>
-  );
-  if (!loaded) return (
-    <>
-      <link href="https://cdn.jsdelivr.net/npm/tailwindcss@3.4.0/dist/tailwind.min.css" rel="stylesheet" />
-      <div className="flex items-center justify-center h-screen text-sm text-gray-500">Loading your data...</div>
-    </>
-  );
+  if (authLoading) return (<div className="flex items-center justify-center h-screen text-sm text-gray-500">Loading...</div>);
+  if (!user) return (<AuthPage onAuth={setUser} />);
+  if (!loaded) return (<div className="flex items-center justify-center h-screen text-sm text-gray-500">Loading your data...</div>);
 
   return (
-    <>
-      <link href="https://cdn.jsdelivr.net/npm/tailwindcss@3.4.0/dist/tailwind.min.css" rel="stylesheet" />
-      <div className="max-w-6xl mx-auto px-6 py-8 min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+    <div className="max-w-6xl mx-auto px-6 py-8 min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
       <StreakBadge streak={streak} todayMins={todayMins} />
       <QuotesBanner />
       <CountdownBanner sessions={sessions} />
@@ -726,7 +709,6 @@ export default function App() {
       {page === PAGES.REFLECTION && <ReflectionPage sessions={sessions} />}
       {page === PAGES.SLEEP && <SleepPage sleepLogs={sleepLogs} setSleepLogs={setSleepLogs} />}
       <Footer onLogout={handleLogout} />
-      </div>
-    </>
+    </div>
   );
 }
