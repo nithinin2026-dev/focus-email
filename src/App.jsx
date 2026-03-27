@@ -549,12 +549,22 @@ function TimerPage({ sessions, setSessions }) {
   useEffect(() => {
     if (remaining <= 0 && running) {
       setRunning(false); playBell();
+      // Push notification
+      if ("Notification" in window && Notification.permission === "granted") {
+        try { new Notification("Focus Maxing", { body: mode === "focus" ? `${tag || "Focus"} session complete! Time for a break.` : "Break over! Ready to focus again?", icon: "🔥" }); } catch(e) {}
+      }
       if (mode === "focus") { const mins = Math.round(focusDur / 60); addSession({ id: Date.now(), tag: tag || "Untitled", duration: mins, date: todayStr(), ts: Date.now() }); setMode("break"); setElapsed(0); }
       else { setMode("focus"); setElapsed(0); }
     }
   }, [remaining, running]);
 
-  const toggle = () => { if (!running) { initBell(); playStartPop(); } else { playStopPop(); } setRunning(!running); };
+  const toggle = () => {
+    if (!running) {
+      initBell(); playStartPop();
+      if ("Notification" in window && Notification.permission === "default") { Notification.requestPermission(); }
+    } else { playStopPop(); }
+    setRunning(!running);
+  };
   const reset = () => { setRunning(false); setElapsed(0); };
   const skip = () => {
     setRunning(false);
@@ -877,7 +887,7 @@ function AnalysisPage({ sessions, setSessions }) {
   );
 }
 
-// ─── Calendar Page (Yearly Heatmap — Excel style) ───
+// ─── Calendar Page (Yearly Heatmap — Excel style, full width) ───
 function CalendarPage({ sessions }) {
   const currentYear = new Date().getFullYear();
   const [selectedYear, setSelectedYear] = useState(currentYear);
@@ -909,63 +919,59 @@ function CalendarPage({ sessions }) {
   const dayHeaders = ["M", "T", "W", "Th", "F", "Sa", "Su"];
   const yearOptions = [];
   for (let y = 2025; y <= 2027; y++) yearOptions.push(y);
-
-  // Yearly totals
   const totalFireDays = fireDays.size;
 
-  // Render a single month block
   function MonthBlock({ year, month }) {
     const monthNames = ["January","February","March","April","May","June","July","August","September","October","November","December"];
     const daysInMonth = new Date(year, month + 1, 0).getDate();
-    // Monday-based: getDay() 0=Sun → shift so Mon=0
     const firstDayRaw = new Date(year, month, 1).getDay();
-    const firstDayMon = (firstDayRaw + 6) % 7; // Mon=0, Tue=1 ... Sun=6
+    const firstDayMon = (firstDayRaw + 6) % 7;
     const cells = [];
     for (let i = 0; i < firstDayMon; i++) cells.push(null);
     for (let d = 1; d <= daysInMonth; d++) cells.push(d);
-    // Pad to fill last row
     while (cells.length % 7 !== 0) cells.push(null);
 
-    // Avg per day this month (days with data)
-    let monthTotal = 0; let monthActiveDays = 0;
+    // Avg = total hours this month / total days in month (not just active days)
+    let monthTotal = 0;
     for (let d = 1; d <= daysInMonth; d++) {
       const key = `${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-      const mins = dayMinsMap[key] || 0;
-      if (mins > 0) { monthTotal += mins; monthActiveDays++; }
+      monthTotal += (dayMinsMap[key] || 0);
     }
-    const avgMins = monthActiveDays > 0 ? Math.round(monthTotal / monthActiveDays) : 0;
+    const avgMins = Math.round(monthTotal / daysInMonth);
 
-    // Fire count this month
     let monthFireCount = 0;
     for (let d = 1; d <= daysInMonth; d++) {
       const key = `${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
       if (fireDays.has(key)) monthFireCount++;
     }
 
-    const boxSize = 18;
-    const gap = 2;
     const now = new Date();
     const isCurrentMonth = year === now.getFullYear() && month === now.getMonth();
 
     return (
-      <div style={{ fontFamily: font, minWidth: 0 }}>
-        {/* Month header */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 4, padding: "0 1px" }}>
-          <span style={{ fontSize: 11, fontWeight: 700 }}>{monthNames[month]}</span>
-          <span style={{ fontSize: 9, fontWeight: 600, color: avgMins > 0 ? "#2A9D8F" : "#ccc" }}>
+      <div style={{ fontFamily: font, flex: 1, minWidth: 0 }}>
+        {/* Month header row */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6, padding: "0 2px" }}>
+          <span style={{ fontSize: 13, fontWeight: 800 }}>{monthNames[month]}</span>
+          <span style={{ fontSize: 11, fontWeight: 700, color: avgMins > 0 ? "#2A9D8F" : "#bbb" }}>
             Avg {formatHM(avgMins)}
           </span>
         </div>
         {/* Day headers */}
-        <div style={{ display: "grid", gridTemplateColumns: `repeat(7, ${boxSize}px)`, gap: gap, marginBottom: 2 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 0 }}>
           {dayHeaders.map((d, i) => (
-            <div key={i} style={{ width: boxSize, height: 12, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 7, fontWeight: 700, color: "#999" }}>{d}</div>
+            <div key={i} style={{
+              height: 20, display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 9, fontWeight: 700, color: "#666",
+              border: "1px solid #000", borderBottom: "2px solid #000",
+              background: "#f0f0f0"
+            }}>{d}</div>
           ))}
         </div>
         {/* Day cells */}
-        <div style={{ display: "grid", gridTemplateColumns: `repeat(7, ${boxSize}px)`, gap: gap }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 0 }}>
           {cells.map((day, i) => {
-            if (day === null) return <div key={`e${i}`} style={{ width: boxSize, height: boxSize }} />;
+            if (day === null) return <div key={`e${i}`} style={{ aspectRatio: "1", border: "0.5px solid #e0e0e0", background: "#fafafa" }} />;
             const key = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
             const isFire = fireDays.has(key);
             const isFuture = key > todayKey;
@@ -974,21 +980,20 @@ function CalendarPage({ sessions }) {
 
             let bg = "#fff";
             let color = "#000";
-            let borderColor = "#ccc";
-            if (isFire) { bg = "#2A9D8F"; color = "#fff"; borderColor = "#2A9D8F"; }
-            else if (isMissed) { bg = "#E63946"; color = "#fff"; borderColor = "#E63946"; }
-            else if (isFuture) { bg = "#fff"; color = "#ddd"; borderColor = "#e0e0e0"; }
-            if (isToday) borderColor = "#000";
+            if (isFire) { bg = "#2A9D8F"; color = "#fff"; }
+            else if (isMissed) { bg = "#E63946"; color = "#fff"; }
+            else if (isFuture) { bg = "#fff"; color = "#ccc"; }
 
             return (
               <div key={i} title={`${key}${dayMinsMap[key] ? " — " + formatHM(dayMinsMap[key]) : ""}`} style={{
-                width: boxSize, height: boxSize,
-                border: `1.5px solid ${borderColor}`,
+                aspectRatio: "1",
+                border: isToday ? "2.5px solid #000" : "1px solid #333",
                 background: bg, color,
                 display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: 7, fontWeight: isToday ? 800 : 600,
-                borderRadius: 2, cursor: "default",
-                boxShadow: isToday ? "0 0 0 1.5px #000" : "none"
+                fontSize: 11, fontWeight: isToday ? 900 : 600,
+                cursor: "default",
+                position: "relative",
+                zIndex: isToday ? 2 : 1
               }}>
                 {day}
               </div>
@@ -996,14 +1001,13 @@ function CalendarPage({ sessions }) {
           })}
         </div>
         {/* Month fire count */}
-        <div style={{ fontSize: 8, color: "#999", marginTop: 4, textAlign: "center" }}>
+        <div style={{ fontSize: 10, color: "#666", marginTop: 6, textAlign: "center", fontWeight: 600 }}>
           {monthFireCount} 🔥
         </div>
       </div>
     );
   }
 
-  // 4 rows × 3 months
   const rows = [[0,1,2],[3,4,5],[6,7,8],[9,10,11]];
 
   return (
@@ -1011,13 +1015,13 @@ function CalendarPage({ sessions }) {
       {/* Controls */}
       <div style={{ display: "flex", justifyContent: "center", gap: 10, marginBottom: 20, flexWrap: "wrap" }}>
         <select value={selectedYear} onChange={e => setSelectedYear(Number(e.target.value))} style={{
-          border: "2px solid #000", padding: "7px 12px", fontSize: 13, fontFamily: font,
+          border: "2px solid #000", padding: "8px 14px", fontSize: 13, fontFamily: font,
           fontWeight: 700, background: "#fff", outline: "none", cursor: "pointer", borderRadius: 4
         }}>
           {yearOptions.map(y => (<option key={y} value={y}>{y}</option>))}
         </select>
         <select value={selectedTag} onChange={e => setSelectedTag(e.target.value)} style={{
-          border: "2px solid #000", padding: "7px 12px", fontSize: 13, fontFamily: font,
+          border: "2px solid #000", padding: "8px 14px", fontSize: 13, fontFamily: font,
           fontWeight: 700, background: "#fff", outline: "none", cursor: "pointer", borderRadius: 4
         }}>
           <option value="__all__">All — 2h+ goal</option>
@@ -1026,23 +1030,23 @@ function CalendarPage({ sessions }) {
       </div>
 
       {/* Year summary */}
-      <div style={{ textAlign: "center", marginBottom: 20 }}>
-        <span style={{ fontSize: 22, fontWeight: 800 }}>{totalFireDays}</span>
-        <span style={{ fontSize: 12, color: "#999", marginLeft: 6, fontWeight: 600 }}>{isAllMode ? "fire days" : `${selectedTag} days`} in {selectedYear}</span>
+      <div style={{ textAlign: "center", marginBottom: 24 }}>
+        <span style={{ fontSize: 26, fontWeight: 800 }}>{totalFireDays}</span>
+        <span style={{ fontSize: 13, color: "#999", marginLeft: 8, fontWeight: 600 }}>{isAllMode ? "fire days" : `${selectedTag} days`} in {selectedYear}</span>
       </div>
 
-      {/* 4 rows × 3 months */}
+      {/* 4 rows × 3 months — full width */}
       {rows.map((monthGroup, rowIdx) => (
-        <div key={rowIdx} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, marginBottom: 20 }}>
+        <div key={rowIdx} style={{ display: "flex", gap: 12, marginBottom: 24 }}>
           {monthGroup.map(m => (<MonthBlock key={m} year={selectedYear} month={m} />))}
         </div>
       ))}
 
       {/* Legend */}
-      <div style={{ display: "flex", justifyContent: "center", gap: 16, fontSize: 10, color: "#666", marginTop: 8 }}>
-        <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 12, height: 12, background: "#2A9D8F", border: "1.5px solid #2A9D8F", borderRadius: 2, display: "inline-block" }} /> {isAllMode ? "2h+" : "Studied"}</span>
-        <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 12, height: 12, background: "#E63946", border: "1.5px solid #E63946", borderRadius: 2, display: "inline-block" }} /> Missed</span>
-        <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 12, height: 12, background: "#fff", border: "1.5px solid #e0e0e0", borderRadius: 2, display: "inline-block" }} /> Future</span>
+      <div style={{ display: "flex", justifyContent: "center", gap: 20, fontSize: 11, color: "#555", marginTop: 4, fontWeight: 600 }}>
+        <span style={{ display: "flex", alignItems: "center", gap: 5 }}><span style={{ width: 14, height: 14, background: "#2A9D8F", border: "1px solid #000", display: "inline-block" }} /> {isAllMode ? "2h+" : "Studied"}</span>
+        <span style={{ display: "flex", alignItems: "center", gap: 5 }}><span style={{ width: 14, height: 14, background: "#E63946", border: "1px solid #000", display: "inline-block" }} /> Missed</span>
+        <span style={{ display: "flex", alignItems: "center", gap: 5 }}><span style={{ width: 14, height: 14, background: "#fff", border: "1px solid #000", display: "inline-block" }} /> Future</span>
       </div>
     </div>
   );
@@ -1194,7 +1198,7 @@ export default function App() {
   if (!loaded) return (<div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", fontFamily: "'Nunito', sans-serif", fontSize: 14, color: "#999" }}><link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet" />Loading your data...</div>);
 
   return (
-    <div style={{ maxWidth: 540, margin: "0 auto", padding: "60px 20px 60px", minHeight: "100vh", background: "#fff", color: "#000" }}>
+    <div style={{ maxWidth: page === PAGES.CALENDAR ? 900 : 540, margin: "0 auto", padding: "60px 20px 60px", minHeight: "100vh", background: "#fff", color: "#000", transition: "max-width 0.3s ease" }}>
       <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
       <TopNavBar sessions={sessions} streak={streak} todayMins={todayMins} onMenuClick={() => setSidebarOpen(true)} />
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} page={page} setPage={setPage} sessions={sessions} onLogout={handleLogout} />
