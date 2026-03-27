@@ -212,7 +212,7 @@ function TopNavBar({ sessions, streak, todayMins, onMenuClick }) {
       </div>
 
       {/* Center: quote */}
-      <div style={{ flex: 1, textAlign: "center", fontSize: 11, fontWeight: 600, color: "#888", fontStyle: "italic", padding: "0 12px", overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>
+      <div style={{ flex: 1, textAlign: "center", fontSize: 13, fontWeight: 700, color: "#333", fontStyle: "italic", padding: "0 12px", overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>
         "{QUOTES[quoteIdx]}"
       </div>
 
@@ -308,6 +308,7 @@ function WeekStrip({ sessions }) {
       </div>
 
       {/* Today hours | countdown | target */}
+      <div style={{ borderTop: "1px solid #ddd", marginTop: 2, paddingTop: 10 }} />
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12, fontWeight: 700 }}>
         <span style={{ color: todayColor }}>📖 {formatHM(todayMins)} today</span>
         <span style={{ color: midColor }}>⏳ {hrsLeft}h {mLeft}m left</span>
@@ -827,9 +828,6 @@ function AnalysisPage({ sessions }) {
   const tR = { display: "grid", padding: "9px 0", borderBottom: "1px solid #f0f0f0", fontFamily: font, fontSize: 13, alignItems: "center" };
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 16 }}>
-        <button onClick={() => exportToExcel(sessions)} disabled={sessions.length === 0} style={{ padding: "8px 16px", border: "2px solid #000", background: "#000", color: "#fff", fontSize: 11, fontFamily: font, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", cursor: sessions.length > 0 ? "pointer" : "default", opacity: sessions.length > 0 ? 1 : 0.3, display: "flex", alignItems: "center", gap: 6 }}>↓ Export Excel</button>
-      </div>
       <SectionHeader>Daily Report</SectionHeader>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 24, marginBottom: 20, fontFamily: font }}>
         <button onClick={() => shiftDate(-1)} style={navBtn}>←</button>
@@ -867,6 +865,9 @@ function AnalysisPage({ sessions }) {
           <SectionHeader>Focus Insights</SectionHeader>
           {sessions.length > 0 && (<><div style={{ ...tR, borderBottom: "2px solid #000", padding: "0 0 6px", gridTemplateColumns: "1fr 130px 70px" }}><span style={tH}>Insight</span><span style={{ ...tH, textAlign: "right" }}>Value</span><span style={{ ...tH, textAlign: "right" }}>Count</span></div><div style={{ ...tR, gridTemplateColumns: "1fr 130px 70px" }}><div><div style={{ fontWeight: 600 }}>Comfort Zone</div><div style={{ fontSize: 10, color: "#999", marginTop: 2 }}>Most consistent range</div></div><span style={{ textAlign: "right", fontWeight: 700, color: "#6A4C93" }}>{bestZone && bestZone.count > 0 ? bestZone.label : "—"}</span><span style={{ textAlign: "right", color: "#666" }}>{bestZone && bestZone.count > 0 ? `${bestZone.count} days` : "—"}</span></div><div style={{ ...tR, gridTemplateColumns: "1fr 130px 70px" }}><div><div style={{ fontWeight: 600 }}>Best Focus Day</div><div style={{ fontSize: 10, color: "#999", marginTop: 2 }}>Day you study most often</div></div><span style={{ textAlign: "right", fontWeight: 700, color: "#2A9D8F" }}>{bestDow && bestDow.count > 0 ? dowNames[bestDow.dow] : "—"}</span><span style={{ textAlign: "right", color: "#666" }}>{bestDow && bestDow.count > 0 ? `${bestDow.count} days` : "—"}</span></div><div style={{ ...tR, gridTemplateColumns: "1fr 130px 70px" }}><div><div style={{ fontWeight: 600 }}>Peak Time Window</div><div style={{ fontSize: 10, color: "#999", marginTop: 2 }}>When you focus most</div></div><span style={{ textAlign: "right", fontWeight: 700, color: "#457B9D" }}>{bestWindow ? bestWindow.label : "—"}</span><span style={{ textAlign: "right", color: "#666" }}>{bestWindow ? `${bestWindow.count} days` : "—"}</span></div></>)}
         </div>
+      </div>
+      <div style={{ display: "flex", justifyContent: "center", marginTop: 40, marginBottom: 20 }}>
+        <button onClick={() => exportToExcel(sessions)} disabled={sessions.length === 0} style={{ padding: "10px 24px", border: "2px solid #000", background: "#000", color: "#fff", fontSize: 11, fontFamily: font, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", cursor: sessions.length > 0 ? "pointer" : "default", opacity: sessions.length > 0 ? 1 : 0.3, display: "flex", alignItems: "center", gap: 6 }}>↓ Export Excel</button>
       </div>
     </div>
   );
@@ -1077,8 +1078,7 @@ export default function App() {
       <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
       <TopNavBar sessions={sessions} streak={streak} todayMins={todayMins} onMenuClick={() => setSidebarOpen(true)} />
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} page={page} setPage={setPage} sessions={sessions} onLogout={handleLogout} />
-      <WeekStrip sessions={sessions} />
-      {page === PAGES.TIMER && <TimerPage sessions={sessions} setSessions={setSessions} />}
+      {page === PAGES.TIMER && <><WeekStrip sessions={sessions} /><TimerPage sessions={sessions} setSessions={setSessions} /></>}
       {page === PAGES.TASKS && <TasksPage tasks={tasks} setTasks={setTasks} />}
       {page === PAGES.ANALYSIS && <AnalysisPage sessions={sessions} />}
       {page === PAGES.CALENDAR && <CalendarPage sessions={sessions} />}
