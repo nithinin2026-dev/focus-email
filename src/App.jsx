@@ -334,31 +334,30 @@ function Nav({ page, setPage, onLogout }) {
     { key: PAGES.REFLECTION, label: "Reflect" },
   ];
   return (
-    <nav style={{
-      display: "flex", gap: 0, borderBottom: "2px solid #000",
-      marginBottom: 40, fontFamily: "'Nunito', sans-serif",
-      position: "relative"
-    }}>
-      {items.map(i => (
-        <button key={i.key} onClick={() => setPage(i.key)} style={{
-          flex: 1, padding: "14px 0", border: "none", cursor: "pointer",
-          background: page === i.key ? "#000" : "transparent",
-          color: page === i.key ? "#fff" : "#000",
-          fontSize: 13, fontWeight: 600, letterSpacing: "0.08em",
-          textTransform: "uppercase", fontFamily: "inherit",
-          transition: "all 0.2s ease"
-        }}>
-          {i.label}
-        </button>
-      ))}
-      <button onClick={onLogout} title="Logout" style={{
-        position: "absolute", right: 0, top: -30,
-        border: "1px solid #ddd", background: "#fff", cursor: "pointer",
-        fontSize: 11, fontFamily: "'Nunito', sans-serif", fontWeight: 700,
-        color: "#999", padding: "5px 14px", borderRadius: 20,
-        letterSpacing: "0.04em", textTransform: "uppercase"
-      }}>Logout</button>
-    </nav>
+    <div style={{ marginBottom: 40, fontFamily: "'Nunito', sans-serif" }}>
+      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
+        <button onClick={onLogout} title="Logout" style={{
+          border: "1px solid #ddd", background: "#fff", cursor: "pointer",
+          fontSize: 11, fontFamily: "'Nunito', sans-serif", fontWeight: 700,
+          color: "#999", padding: "5px 14px", borderRadius: 20,
+          letterSpacing: "0.04em", textTransform: "uppercase"
+        }}>Logout</button>
+      </div>
+      <nav style={{ display: "flex", gap: 0, borderBottom: "2px solid #000" }}>
+        {items.map(i => (
+          <button key={i.key} onClick={() => setPage(i.key)} style={{
+            flex: 1, padding: "14px 0", border: "none", cursor: "pointer",
+            background: page === i.key ? "#000" : "transparent",
+            color: page === i.key ? "#fff" : "#000",
+            fontSize: 13, fontWeight: 600, letterSpacing: "0.08em",
+            textTransform: "uppercase", fontFamily: "inherit",
+            transition: "all 0.2s ease"
+          }}>
+            {i.label}
+          </button>
+        ))}
+      </nav>
+    </div>
   );
 }
 
@@ -1498,7 +1497,7 @@ export default function App() {
 
   return (
     <div style={{
-      maxWidth: 480, margin: "0 auto", padding: "56px 20px 60px",
+      maxWidth: 540, margin: "0 auto", padding: "40px 20px 60px",
       minHeight: "100vh", background: "#fff", color: "#000"
     }}>
       <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
