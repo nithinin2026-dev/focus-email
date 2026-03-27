@@ -400,15 +400,13 @@ function TopBar({ sessions, streak }) {
 
   return (
     <div style={{ marginBottom: 20 }}>
-      {/* Top row: stat pills flush left, streak flush right */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <div style={pillStyle}><span>⚡</span><span>{formatHM(maxMins)}</span><span style={labelStyle}>max</span></div>
-          <div style={pillStyle}><span>📊</span><span>{formatHM(monthMins)}</span><span style={labelStyle}>{monthName}</span></div>
-          <div style={pillStyle}><span>📅</span><span>{formatHM(yearMins)}</span><span style={labelStyle}>{yearStr}</span></div>
-        </div>
+      {/* Top row: all pills stretch to fill full width */}
+      <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 16 }}>
+        <div style={{ ...pillStyle, flex: 1, justifyContent: "center" }}><span>⚡</span><span>{formatHM(maxMins)}</span><span style={labelStyle}>max</span></div>
+        <div style={{ ...pillStyle, flex: 1, justifyContent: "center" }}><span>📊</span><span>{formatHM(monthMins)}</span><span style={labelStyle}>{monthName}</span></div>
+        <div style={{ ...pillStyle, flex: 1, justifyContent: "center" }}><span>📅</span><span>{formatHM(yearMins)}</span><span style={labelStyle}>{yearStr}</span></div>
         <div style={{
-          ...pillStyle,
+          ...pillStyle, flex: 1, justifyContent: "center",
           background: streak > 0 ? "#000" : "#e0e0e0",
           color: streak > 0 ? "#fff" : "#999",
           boxShadow: streak > 0 ? "0 2px 12px rgba(0,0,0,0.18)" : "none"
