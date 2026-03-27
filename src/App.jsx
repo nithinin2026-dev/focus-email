@@ -249,7 +249,7 @@ function AuthPage({ onAuth }) {
   return (
     <div style={{ maxWidth: 400, margin: "0 auto", padding: "80px 24px", minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: font }}>
       <div style={{ marginBottom: 40, textAlign: "center" }}>
-        <div style={{ fontSize: 32, fontWeight: 800, letterSpacing: "-0.02em", marginBottom: 4 }}>StudyLog</div>
+        <div style={{ fontSize: 32, fontWeight: 800, letterSpacing: "-0.02em", marginBottom: 4 }}>Focus Maxing</div>
         <div style={{ fontSize: 12, color: "#999", textTransform: "uppercase", letterSpacing: "0.15em", fontWeight: 600 }}>Track your upskilling</div>
       </div>
       <div style={{ width: "100%", maxWidth: 320 }}>
@@ -318,7 +318,7 @@ function Nav({ page, setPage }) {
 }
 
 // ─── Top Stats Bar ───
-function TopBar({ sessions, streak }) {
+function TopBar({ sessions }) {
   const font = "'Nunito', sans-serif";
   const dayTotals = getDayTotals(sessions);
   const maxMins = Object.values(dayTotals).length > 0 ? Math.max(...Object.values(dayTotals)) : 0;
@@ -337,21 +337,29 @@ function TopBar({ sessions, streak }) {
   const dayLabels = ["M", "T", "W", "TH", "F", "SA", "SU"];
   const weekTotal = weekDays.reduce((a, d) => a + (dayTotals[d] || 0), 0);
 
-  const pillStyle = {
+  const fixedPill = {
+    display: "flex", alignItems: "center", gap: 6,
+    background: "#000", color: "#fff",
+    padding: "7px 14px", borderRadius: 40,
+    fontFamily: font, fontSize: 13, fontWeight: 700,
+    letterSpacing: "0.02em", boxShadow: "0 2px 10px rgba(0,0,0,0.15)"
+  };
+  const lblStyle = { fontWeight: 400, fontSize: 10, opacity: 0.6 };
+  const inlinePill = {
     display: "inline-flex", alignItems: "center", gap: 7,
     background: "#000", color: "#fff",
-    padding: "10px 18px", borderRadius: 40,
-    fontFamily: font, fontSize: 15, fontWeight: 700,
-    letterSpacing: "0.02em", boxShadow: "0 2px 12px rgba(0,0,0,0.18)"
+    padding: "8px 14px", borderRadius: 40,
+    fontFamily: font, fontSize: 13, fontWeight: 700,
+    boxShadow: "0 2px 12px rgba(0,0,0,0.18)"
   };
-  const labelStyle = { fontWeight: 400, fontSize: 12, opacity: 0.6 };
 
   return (
     <div style={{ marginBottom: 20 }}>
-      <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 16, width: "100vw", marginLeft: "calc(-50vw + 50%)", paddingLeft: 20, paddingRight: 20, boxSizing: "border-box" }}>
-        <div style={{ ...pillStyle, flex: 1, justifyContent: "center" }}><span>⚡</span><span>{formatHM(maxMins)}</span><span style={labelStyle}>max</span></div>
-        <div style={{ ...pillStyle, flex: 1, justifyContent: "center" }}><span>📊</span><span>{formatHM(monthMins)}</span><span style={labelStyle}>{monthName}</span></div>
-        <div style={{ ...pillStyle, flex: 1, justifyContent: "center" }}><span>📅</span><span>{formatHM(yearMins)}</span><span style={labelStyle}>{yearStr}</span></div>
+      {/* Fixed top-left stat pills */}
+      <div style={{ position: "fixed", top: 14, left: 16, zIndex: 999, display: "flex", flexDirection: "column", gap: 6 }}>
+        <div style={fixedPill}><span>⚡</span><span>{formatHM(maxMins)}</span><span style={lblStyle}>max</span></div>
+        <div style={fixedPill}><span>📊</span><span>{formatHM(monthMins)}</span><span style={lblStyle}>{monthName}</span></div>
+        <div style={fixedPill}><span>📅</span><span>{formatHM(yearMins)}</span><span style={lblStyle}>{yearStr}</span></div>
       </div>
       {/* Week bar with weekly total pill */}
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -382,9 +390,7 @@ function TopBar({ sessions, streak }) {
             );
           })}
         </div>
-        <div style={{ ...pillStyle, padding: "8px 14px", fontSize: 13, flexShrink: 0 }}>
-          {formatHM(weekTotal)}
-        </div>
+        <div style={inlinePill}>{formatHM(weekTotal)}</div>
       </div>
     </div>
   );
@@ -797,7 +803,7 @@ async function exportToExcel(sessions) {
   XLSX.utils.book_append_sheet(wb, ws1, "Day-wise");
   XLSX.utils.book_append_sheet(wb, ws2, "Week-wise");
   XLSX.utils.book_append_sheet(wb, ws3, "Month-wise");
-  XLSX.writeFile(wb, `StudyLog_Export_${todayStr()}.xlsx`);
+  XLSX.writeFile(wb, `FocusMaxing_Export_${todayStr()}.xlsx`);
 }
 
 // ─── Analysis Page ───
@@ -1073,12 +1079,12 @@ export default function App() {
   if (!loaded) return (<div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", fontFamily: "'Nunito', sans-serif", fontSize: 14, color: "#999" }}><link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet" />Loading your data...</div>);
 
   return (
-    <div style={{ maxWidth: 540, margin: "0 auto", padding: "40px 20px 60px", minHeight: "100vh", background: "#fff", color: "#000" }}>
+    <div style={{ maxWidth: 540, margin: "0 auto", padding: "120px 20px 60px", minHeight: "100vh", background: "#fff", color: "#000" }}>
       <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
       <StreakBadge streak={streak} />
       <QuotesBanner />
       <CountdownBanner />
-      <TopBar sessions={sessions} streak={streak} />
+      <TopBar sessions={sessions} />
       <Nav page={page} setPage={setPage} />
       {page === PAGES.TIMER && <TimerPage sessions={sessions} setSessions={setSessions} />}
       {page === PAGES.TASKS && <TasksPage tasks={tasks} setTasks={setTasks} />}
