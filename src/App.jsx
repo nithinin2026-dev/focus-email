@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import * as Tone from "tone";
 import { supabase } from "./supabaseClient";
 
-const PAGES = { TIMER: "timer", TASKS: "tasks", ANALYSIS: "analysis", CALENDAR: "calendar", REFLECTION: "reflection" };
+const PAGES = { TIMER: "timer", TASKS: "tasks", ANALYSIS: "analysis", CALENDAR: "calendar", REFLECTION: "reflection", SLEEP: "sleep" };
 
 // ─── Quotes ───
 const QUOTES = [
@@ -98,6 +98,19 @@ async function deleteTask(taskId) {
   const { error } = await supabase.from("tasks").delete().eq("id", taskId);
   if (error) console.error("Delete task error:", error);
 }
+// Sleep
+async function loadSleepLogs() {
+  const { data, error } = await supabase.from("sleep_logs").select("*").order("date", { ascending: false });
+  if (error) { console.error("Load sleep error:", error); return []; }
+  return data;
+}
+async function upsertSleepLog(date, sleepStart, wakeUp, totalMins) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+  const { data, error } = await supabase.from("sleep_logs").upsert({ user_id: user.id, date, sleep_start: sleepStart, wake_up: wakeUp, total_mins: totalMins }, { onConflict: "user_id,date" }).select().single();
+  if (error) { console.error("Upsert sleep error:", error); return null; }
+  return data;
+}
 
 // ─── Utilities ───
 function todayStr() { return new Date().toISOString().slice(0, 10); }
@@ -152,30 +165,50 @@ function getBarGradient(mins) {
   return `linear-gradient(180deg, ${c}, ${c}88)`;
 }
 
-// ─── Countdown to midnight ───
-function CountdownBanner() {
+// ─── Countdown Banner (today hours | midnight | target date) ───
+function CountdownBanner({ sessions }) {
   const [now, setNow] = useState(new Date());
-  useEffect(() => {
-    const t = setInterval(() => setNow(new Date()), 60000);
-    return () => clearInterval(t);
-  }, []);
+  const [targetDate, setTargetDate] = useState(() => localStorage.getItem("sl_targetDate") || "");
+  const [editingTarget, setEditingTarget] = useState(false);
+  const [tempTarget, setTempTarget] = useState("");
+  useEffect(() => { const t = setInterval(() => setNow(new Date()), 60000); return () => clearInterval(t); }, []);
+  const font = "'Nunito', sans-serif";
+
+  // Today's hours
+  const todayMins = sessions.filter(s => s.date === todayStr()).reduce((a, s) => a + s.duration, 0);
+  const todayColor = todayMins >= 240 ? "#2A9D8F" : todayMins >= 120 ? "#F4A261" : "#E63946";
+
+  // Midnight countdown
   const hr = now.getHours();
   const minsLeft = (24 - hr - 1) * 60 + (60 - now.getMinutes());
-  const hrsLeft = Math.floor(minsLeft / 60);
-  const mLeft = minsLeft % 60;
-  // Color: green morning, orange afternoon, red night
-  let color;
-  if (hr < 12) color = "#2A9D8F";
-  else if (hr < 15) color = "#F4A261";
-  else if (hr < 18) color = "#E76F51";
-  else if (hr < 21) color = "#E63946";
-  else color = "#C1121F";
+  const hrsLeft = Math.floor(minsLeft / 60); const mLeft = minsLeft % 60;
+  let midColor;
+  if (hr < 12) midColor = "#2A9D8F"; else if (hr < 15) midColor = "#F4A261"; else if (hr < 18) midColor = "#E76F51"; else if (hr < 21) midColor = "#E63946"; else midColor = "#C1121F";
+
+  // Target date countdown
+  const saveTarget = () => { localStorage.setItem("sl_targetDate", tempTarget); setTargetDate(tempTarget); setEditingTarget(false); };
+  let targetText = "";
+  if (targetDate) {
+    const diff = Math.ceil((new Date(targetDate + "T00:00:00") - new Date(todayStr() + "T00:00:00")) / 86400000);
+    if (diff > 0) targetText = `${diff}d left`;
+    else if (diff === 0) targetText = "Today!";
+    else targetText = `${Math.abs(diff)}d ago`;
+  }
+
   return (
-    <div style={{
-      textAlign: "center", fontFamily: "'Nunito', sans-serif", fontSize: 13, fontWeight: 700,
-      color, marginBottom: 12, letterSpacing: "0.02em"
-    }}>
-      ⏳ {hrsLeft}h {mLeft}m left today
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontFamily: font, fontSize: 13, fontWeight: 700, marginBottom: 12 }}>
+      <span style={{ color: todayColor }}>📖 {formatHM(todayMins)} today</span>
+      <span style={{ color: midColor }}>⏳ {hrsLeft}h {mLeft}m left</span>
+      {editingTarget ? (
+        <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+          <input type="date" value={tempTarget} onChange={e => setTempTarget(e.target.value)} style={{ border: "1px solid #ccc", padding: "4px 6px", fontSize: 11, fontFamily: font, outline: "none" }} />
+          <button onClick={saveTarget} style={{ border: "none", background: "#000", color: "#fff", padding: "4px 8px", fontSize: 10, fontFamily: font, fontWeight: 700, cursor: "pointer", borderRadius: 4 }}>Set</button>
+        </span>
+      ) : (
+        <span onDoubleClick={() => { setTempTarget(targetDate || todayStr()); setEditingTarget(true); }} style={{ color: "#6A4C93", cursor: "pointer" }} title="Double-click to set target date">
+          {targetDate ? `🎯 ${targetText}` : "🎯 Set goal"}
+        </span>
+      )}
     </div>
   );
 }
@@ -271,23 +304,24 @@ function AuthPage({ onAuth }) {
 }
 
 // ─── Streak Badge (fixed top-right) ───
-function StreakBadge({ streak }) {
+function StreakBadge({ streak, todayMins }) {
+  const hitTarget = todayMins >= 120;
   return (
     <div style={{
       position: "fixed", top: 16, right: 20, zIndex: 999,
       display: "flex", alignItems: "center", gap: 7,
-      background: streak > 0 ? "#000" : "#e0e0e0",
-      color: streak > 0 ? "#fff" : "#999",
+      background: hitTarget ? (streak > 0 ? "#000" : "#e0e0e0") : "#E63946",
+      color: hitTarget ? (streak > 0 ? "#fff" : "#999") : "#fff",
       padding: "10px 18px", borderRadius: 40,
       fontFamily: "'Nunito', sans-serif", fontSize: 15, fontWeight: 700,
       letterSpacing: "0.02em",
-      boxShadow: streak > 0 ? "0 2px 12px rgba(0,0,0,0.18)" : "none",
+      boxShadow: "0 2px 12px rgba(0,0,0,0.18)",
       transition: "all 0.3s ease"
     }}>
-      <span style={{ fontSize: 20 }}>{streak > 0 ? "🔥" : "○"}</span>
+      <span style={{ fontSize: 20 }}>{hitTarget ? (streak > 0 ? "🔥" : "○") : "⚠️"}</span>
       <span>{streak}</span>
-      <span style={{ fontWeight: 400, fontSize: 12, opacity: 0.6, marginLeft: 2 }}>
-        {streak === 1 ? "day" : "days"}
+      <span style={{ fontWeight: 400, fontSize: 12, opacity: 0.8, marginLeft: 2 }}>
+        {hitTarget ? (streak === 1 ? "day" : "days") : "do 2h+"}
       </span>
     </div>
   );
@@ -301,6 +335,7 @@ function Nav({ page, setPage }) {
     { key: PAGES.ANALYSIS, label: "Analysis" },
     { key: PAGES.CALENDAR, label: "Calendar" },
     { key: PAGES.REFLECTION, label: "Reflect" },
+    { key: PAGES.SLEEP, label: "Sleep" },
   ];
   return (
     <nav style={{ display: "flex", gap: 0, borderBottom: "2px solid #000", marginBottom: 40, fontFamily: "'Nunito', sans-serif" }}>
@@ -309,7 +344,7 @@ function Nav({ page, setPage }) {
           flex: 1, padding: "14px 0", border: "none", cursor: "pointer",
           background: page === i.key ? "#000" : "transparent",
           color: page === i.key ? "#fff" : "#000",
-          fontSize: 12, fontWeight: 600, letterSpacing: "0.06em",
+          fontSize: 11, fontWeight: 600, letterSpacing: "0.04em",
           textTransform: "uppercase", fontFamily: "inherit", transition: "all 0.2s ease"
         }}>{i.label}</button>
       ))}
@@ -796,13 +831,25 @@ async function exportToExcel(sessions) {
     return { Month: new Date(parseInt(y), parseInt(m) - 1).toLocaleDateString("en-US", { month: "long", year: "numeric" }), "Hours": +(mins / 60).toFixed(2) };
   });
 
+  // Sheet 4: Topic-wise
+  const tagMap = {}; const tagFirstDate = {};
+  sessions.forEach(s => {
+    tagMap[s.tag] = (tagMap[s.tag] || 0) + s.duration;
+    if (!tagFirstDate[s.tag] || s.date < tagFirstDate[s.tag]) tagFirstDate[s.tag] = s.date;
+  });
+  const topicData = Object.entries(tagMap).sort((a, b) => b[1] - a[1]).map(([tag, mins]) => ({
+    Topic: tag, "Hours": +(mins / 60).toFixed(2), "Started": tagFirstDate[tag] || ""
+  }));
+
   const wb = XLSX.utils.book_new();
   const ws1 = XLSX.utils.json_to_sheet(dailyData); ws1["!cols"] = [{ wch: 12 }, { wch: 12 }, { wch: 8 }, { wch: 6 }];
   const ws2 = XLSX.utils.json_to_sheet(weeklyData); ws2["!cols"] = [{ wch: 30 }, { wch: 10 }];
   const ws3 = XLSX.utils.json_to_sheet(monthlyData); ws3["!cols"] = [{ wch: 20 }, { wch: 10 }];
+  const ws4 = XLSX.utils.json_to_sheet(topicData); ws4["!cols"] = [{ wch: 20 }, { wch: 10 }, { wch: 12 }];
   XLSX.utils.book_append_sheet(wb, ws1, "Day-wise");
   XLSX.utils.book_append_sheet(wb, ws2, "Week-wise");
   XLSX.utils.book_append_sheet(wb, ws3, "Month-wise");
+  XLSX.utils.book_append_sheet(wb, ws4, "Topic-wise");
   XLSX.writeFile(wb, `FocusMaxing_Export_${todayStr()}.xlsx`);
 }
 
@@ -1036,6 +1083,151 @@ function ReflectionPage({ sessions }) {
   );
 }
 
+// ═══════════════════════════════════════════
+// ─── Sleep Page ───
+// ═══════════════════════════════════════════
+function SleepPage({ sleepLogs, setSleepLogs }) {
+  const [sleepStart, setSleepStart] = useState("23:00");
+  const [wakeUp, setWakeUp] = useState("06:30");
+  const [logDate, setLogDate] = useState(todayStr());
+  const font = "'Nunito', sans-serif";
+
+  const calcSleepMins = (start, wake) => {
+    const [sh, sm] = start.split(":").map(Number);
+    const [wh, wm] = wake.split(":").map(Number);
+    let startMin = sh * 60 + sm;
+    let wakeMin = wh * 60 + wm;
+    if (wakeMin <= startMin) wakeMin += 1440; // next day
+    return wakeMin - startMin;
+  };
+
+  const logSleep = async () => {
+    const totalMins = calcSleepMins(sleepStart, wakeUp);
+    const saved = await upsertSleepLog(logDate, sleepStart, wakeUp, totalMins);
+    if (saved) {
+      setSleepLogs(prev => {
+        const filtered = prev.filter(l => l.date !== logDate);
+        return [saved, ...filtered].sort((a, b) => b.date.localeCompare(a.date));
+      });
+    }
+  };
+
+  const sleepColor = (mins) => {
+    if (mins < 360) return "#F4A261"; // <6h orange
+    if (mins <= 450) return "#2A9D8F"; // 6-7.5h green
+    return "#E63946"; // >7.5h red (oversleep)
+  };
+
+  // Bar chart data (last 14 days)
+  const last14 = [];
+  for (let i = 13; i >= 0; i--) {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    last14.push(d.toISOString().slice(0, 10));
+  }
+  const logMap = {};
+  sleepLogs.forEach(l => { logMap[l.date] = l; });
+  const barData = last14.map(d => ({ date: d, mins: logMap[d]?.total_mins || 0 }));
+  const maxSleep = Math.max(...barData.map(d => d.mins), 1);
+  const barH = 120;
+
+  // Weekly avg (last 7 days with data)
+  const recent7 = sleepLogs.slice(0, 7);
+  const avgSleep = recent7.length > 0 ? Math.round(recent7.reduce((a, l) => a + (l.total_mins || 0), 0) / recent7.length) : 0;
+  const avgBed = recent7.length > 0 ? recent7.map(l => l.sleep_start || "23:00").sort()[Math.floor(recent7.length / 2)] : "—";
+  const avgWake = recent7.length > 0 ? recent7.map(l => l.wake_up || "07:00").sort()[Math.floor(recent7.length / 2)] : "—";
+
+  // Monthly avg
+  const thisMonth = todayStr().slice(0, 7);
+  const monthLogs = sleepLogs.filter(l => l.date.startsWith(thisMonth));
+  const monthAvg = monthLogs.length > 0 ? Math.round(monthLogs.reduce((a, l) => a + (l.total_mins || 0), 0) / monthLogs.length) : 0;
+
+  const navBtn = { border: "none", background: "none", fontSize: 20, cursor: "pointer" };
+
+  return (
+    <div>
+      {/* Log sleep */}
+      <div style={{ fontSize: 11, fontFamily: font, textTransform: "uppercase", letterSpacing: "0.15em", color: "#999", marginBottom: 14, fontWeight: 600 }}>Log Sleep</div>
+      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 24 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <label style={{ fontSize: 10, fontFamily: font, color: "#999", fontWeight: 600 }}>DATE</label>
+          <input type="date" value={logDate} onChange={e => setLogDate(e.target.value)} style={{ border: "2px solid #000", padding: "8px 10px", fontSize: 13, fontFamily: font, fontWeight: 600, outline: "none" }} />
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <label style={{ fontSize: 10, fontFamily: font, color: "#999", fontWeight: 600 }}>SLEEP</label>
+          <input type="time" value={sleepStart} onChange={e => setSleepStart(e.target.value)} style={{ border: "2px solid #000", padding: "8px 10px", fontSize: 13, fontFamily: font, fontWeight: 600, outline: "none" }} />
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <label style={{ fontSize: 10, fontFamily: font, color: "#999", fontWeight: 600 }}>WAKE UP</label>
+          <input type="time" value={wakeUp} onChange={e => setWakeUp(e.target.value)} style={{ border: "2px solid #000", padding: "8px 10px", fontSize: 13, fontFamily: font, fontWeight: 600, outline: "none" }} />
+        </div>
+        <button onClick={logSleep} style={{ padding: "10px 20px", border: "2px solid #000", background: "#000", color: "#fff", fontSize: 13, fontFamily: font, fontWeight: 700, cursor: "pointer", alignSelf: "flex-end" }}>Log</button>
+      </div>
+
+      {/* Sleep bar chart */}
+      <div style={{ fontSize: 11, fontFamily: font, textTransform: "uppercase", letterSpacing: "0.15em", color: "#999", marginBottom: 14, fontWeight: 600, marginTop: 32 }}>Last 14 Days</div>
+      <div style={{ overflowX: "auto", paddingBottom: 8 }}>
+        <div style={{ display: "flex", alignItems: "flex-end", gap: 4, minWidth: 14 * 36, height: barH + 40, paddingTop: 16 }}>
+          {barData.map(d => {
+            const h = d.mins > 0 ? (d.mins / maxSleep) * barH : 0;
+            const color = d.mins > 0 ? sleepColor(d.mins) : "#f0f0f0";
+            const dayLabel = new Date(d.date + "T12:00:00").getDate();
+            return (
+              <div key={d.date} style={{ flex: 1, minWidth: 24, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", height: barH + 40 }}>
+                {d.mins > 0 && <span style={{ fontSize: 9, fontFamily: font, fontWeight: 700, marginBottom: 2, color }}>{formatHM(d.mins)}</span>}
+                <div style={{ width: "100%", height: h, background: color, borderRadius: "3px 3px 0 0", minHeight: d.mins > 0 ? 4 : 2 }} />
+                <span style={{ fontSize: 8, fontFamily: font, marginTop: 3, color: "#999" }}>{dayLabel}</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      <div style={{ display: "flex", gap: 16, marginTop: 8, fontFamily: font, fontSize: 10, color: "#999" }}>
+        <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 8, height: 8, background: "#F4A261", borderRadius: 2, display: "inline-block" }} /> &lt;6h</span>
+        <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 8, height: 8, background: "#2A9D8F", borderRadius: 2, display: "inline-block" }} /> 6–7.5h</span>
+        <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 8, height: 8, background: "#E63946", borderRadius: 2, display: "inline-block" }} /> 7.5h+</span>
+      </div>
+
+      {/* Averages */}
+      <div style={{ fontSize: 11, fontFamily: font, textTransform: "uppercase", letterSpacing: "0.15em", color: "#999", marginBottom: 14, fontWeight: 600, marginTop: 32 }}>Averages</div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 24 }}>
+        <div style={{ background: "#f8f8f8", padding: "16px", borderRadius: 8, fontFamily: font }}>
+          <div style={{ fontSize: 10, color: "#999", textTransform: "uppercase", letterSpacing: "0.1em", fontWeight: 600, marginBottom: 6 }}>Weekly (last 7)</div>
+          <div style={{ fontSize: 22, fontWeight: 700 }}>{formatHM(avgSleep)}</div>
+          <div style={{ fontSize: 11, color: "#666", marginTop: 6 }}>Bed: {avgBed}</div>
+          <div style={{ fontSize: 11, color: "#666" }}>Wake: {avgWake}</div>
+        </div>
+        <div style={{ background: "#f8f8f8", padding: "16px", borderRadius: 8, fontFamily: font }}>
+          <div style={{ fontSize: 10, color: "#999", textTransform: "uppercase", letterSpacing: "0.1em", fontWeight: 600, marginBottom: 6 }}>Monthly</div>
+          <div style={{ fontSize: 22, fontWeight: 700 }}>{formatHM(monthAvg)}</div>
+          <div style={{ fontSize: 11, color: "#666", marginTop: 6 }}>{monthLogs.length} nights logged</div>
+        </div>
+      </div>
+
+      {/* Sleep log table */}
+      <div style={{ fontSize: 11, fontFamily: font, textTransform: "uppercase", letterSpacing: "0.15em", color: "#999", marginBottom: 10, fontWeight: 600 }}>Sleep Log</div>
+      <div style={{ display: "grid", gridTemplateColumns: "90px 70px 70px 70px", gap: 0, fontFamily: font, borderBottom: "2px solid #000", paddingBottom: 6, marginBottom: 4 }}>
+        <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em" }}>Date</span>
+        <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em" }}>Sleep</span>
+        <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em" }}>Wake</span>
+        <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", textAlign: "right" }}>Total</span>
+      </div>
+      {sleepLogs.length === 0 && (<div style={{ color: "#ccc", fontFamily: font, fontSize: 13, padding: "20px 0", textAlign: "center" }}>No sleep logs yet</div>)}
+      {sleepLogs.map(l => {
+        const color = sleepColor(l.total_mins || 0);
+        const dayLabel = new Date(l.date + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+        return (
+          <div key={l.id} style={{ display: "grid", gridTemplateColumns: "90px 70px 70px 70px", padding: "8px 0", borderBottom: "1px solid #f0f0f0", fontFamily: font, fontSize: 13 }}>
+            <span style={{ fontWeight: 600, fontSize: 11 }}>{dayLabel}</span>
+            <span style={{ color: "#666" }}>{l.sleep_start || "—"}</span>
+            <span style={{ color: "#666" }}>{l.wake_up || "—"}</span>
+            <span style={{ textAlign: "right", fontWeight: 700, color }}>{l.total_mins ? formatHM(l.total_mins) : "—"}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // ─── Footer with Logout ───
 function Footer({ onLogout }) {
   return (
@@ -1057,6 +1249,7 @@ export default function App() {
   const [page, setPage] = useState(PAGES.TIMER);
   const [sessions, setSessions] = useState([]);
   const [tasks, setTasks] = useState([]);
+  const [sleepLogs, setSleepLogs] = useState([]);
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
@@ -1066,13 +1259,14 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (!user) { setSessions([]); setTasks([]); setLoaded(false); return; }
+    if (!user) { setSessions([]); setTasks([]); setSleepLogs([]); setLoaded(false); return; }
     setLoaded(false);
-    Promise.all([loadSessions(), loadTasks()]).then(([s, t]) => { setSessions(s); setTasks(t); setLoaded(true); });
+    Promise.all([loadSessions(), loadTasks(), loadSleepLogs()]).then(([s, t, sl]) => { setSessions(s); setTasks(t); setSleepLogs(sl); setLoaded(true); });
   }, [user]);
 
-  const handleLogout = async () => { await supabase.auth.signOut(); setUser(null); setSessions([]); setTasks([]); setLoaded(false); };
+  const handleLogout = async () => { await supabase.auth.signOut(); setUser(null); setSessions([]); setTasks([]); setSleepLogs([]); setLoaded(false); };
   const streak = calcStreak(sessions);
+  const todayMins = sessions.filter(s => s.date === todayStr()).reduce((a, s) => a + s.duration, 0);
 
   if (authLoading) return (<div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", fontFamily: "'Nunito', sans-serif", fontSize: 14, color: "#999" }}><link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet" />Loading...</div>);
   if (!user) return (<><link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet" /><AuthPage onAuth={setUser} /></>);
@@ -1081,16 +1275,17 @@ export default function App() {
   return (
     <div style={{ maxWidth: 540, margin: "0 auto", padding: "120px 20px 60px", minHeight: "100vh", background: "#fff", color: "#000" }}>
       <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-      <StreakBadge streak={streak} />
+      <StreakBadge streak={streak} todayMins={todayMins} />
       <QuotesBanner />
-      <CountdownBanner />
-      <TopBar sessions={sessions} />
+      <CountdownBanner sessions={sessions} />
+      <TopBar sessions={sessions} streak={streak} />
       <Nav page={page} setPage={setPage} />
       {page === PAGES.TIMER && <TimerPage sessions={sessions} setSessions={setSessions} />}
       {page === PAGES.TASKS && <TasksPage tasks={tasks} setTasks={setTasks} />}
       {page === PAGES.ANALYSIS && <AnalysisPage sessions={sessions} />}
       {page === PAGES.CALENDAR && <CalendarPage sessions={sessions} />}
       {page === PAGES.REFLECTION && <ReflectionPage sessions={sessions} />}
+      {page === PAGES.SLEEP && <SleepPage sleepLogs={sleepLogs} setSleepLogs={setSleepLogs} />}
       <Footer onLogout={handleLogout} />
     </div>
   );
