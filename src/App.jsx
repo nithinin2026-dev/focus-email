@@ -1273,7 +1273,7 @@ export default function App() {
   if (!loaded) return (<div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", fontFamily: "'Nunito', sans-serif", fontSize: 14, color: "#999" }}><link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet" />Loading your data...</div>);
 
   return (
-    <div style={{ maxWidth: "100%", margin: "0 auto", padding: "0px 0px 0px", minHeight: "100vh", background: "#fff", color: "#000" }}>
+    <div style={{ maxWidth: "75%", margin: "0 auto", padding: "0px 0px 0px", minHeight: "100vh", background: "#fff", color: "#000" }}>
       <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
       <StreakBadge streak={streak} todayMins={todayMins} />
       <QuotesBanner />
