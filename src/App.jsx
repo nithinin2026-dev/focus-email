@@ -222,8 +222,8 @@ function QuotesBanner() {
   }, []);
   return (
     <div style={{
-      textAlign: "center", fontFamily: "'Nunito', sans-serif", fontSize: 13,
-      fontWeight: 600, color: "#666", fontStyle: "italic", marginBottom: 16,
+      textAlign: "center", fontFamily: "'Nunito', sans-serif", fontSize: 17,
+      fontWeight: 600, color: "#1d0c0c", fontStyle: "italic", marginBottom: 16,
       padding: "10px 16px", background: "#f8f8f8", borderRadius: 8,
       transition: "opacity 0.5s ease"
     }}>
@@ -397,8 +397,8 @@ function TopBar({ sessions }) {
         <div style={fixedPill}><span>📅</span><span>{formatHM(yearMins)}</span><span style={lblStyle}>{yearStr}</span></div>
       </div>
       {/* Week bar with weekly total pill */}
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 4, fontFamily: font, flex: 1 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
+        <div style={{ display: "flex", justifyContent: "space-around", gap: 2, fontFamily: font, flex: 1 }}>
           {weekDays.map((dateKey, i) => {
             const mins = dayTotals[dateKey] || 0;
             const isFire = mins >= 120;
