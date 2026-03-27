@@ -326,28 +326,6 @@ function AuthPage({ onAuth }) {
 
 // ─── Components ───
 
-function StreakBadge({ streak }) {
-  return (
-    <div style={{
-      position: "fixed", top: 16, right: 20, zIndex: 999,
-      display: "flex", alignItems: "center", gap: 6,
-      background: streak > 0 ? "#000" : "#e0e0e0",
-      color: streak > 0 ? "#fff" : "#999",
-      padding: "8px 16px", borderRadius: 40,
-      fontFamily: "'Nunito', sans-serif", fontSize: 14, fontWeight: 700,
-      letterSpacing: "0.02em",
-      boxShadow: streak > 0 ? "0 2px 12px rgba(0,0,0,0.18)" : "none",
-      transition: "all 0.3s ease"
-    }}>
-      <span style={{ fontSize: 18 }}>{streak > 0 ? "🔥" : "○"}</span>
-      <span>{streak}</span>
-      <span style={{ fontWeight: 400, fontSize: 11, opacity: 0.7, marginLeft: 2 }}>
-        {streak === 1 ? "day" : "days"}
-      </span>
-    </div>
-  );
-}
-
 function Nav({ page, setPage, onLogout }) {
   const items = [
     { key: PAGES.TIMER, label: "Timer" },
@@ -385,7 +363,7 @@ function Nav({ page, setPage, onLogout }) {
 }
 
 // ─── Top Stats Bar ───
-function TopBar({ sessions }) {
+function TopBar({ sessions, streak }) {
   const font = "'Nunito', sans-serif";
   const dayTotals = {};
   sessions.forEach(s => { dayTotals[s.date] = (dayTotals[s.date] || 0) + s.duration; });
@@ -423,10 +401,23 @@ function TopBar({ sessions }) {
 
   return (
     <div style={{ marginBottom: 20 }}>
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
+      {/* All pills + streak in one row */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
         <div style={pillStyle}><span>⚡</span><span>{formatHM(maxMins)}</span><span style={labelStyle}>max</span></div>
         <div style={pillStyle}><span>📊</span><span>{formatHM(monthMins)}</span><span style={labelStyle}>{monthName}</span></div>
         <div style={pillStyle}><span>📅</span><span>{formatHM(yearMins)}</span><span style={labelStyle}>{yearStr}</span></div>
+        <div style={{ marginLeft: "auto" }}>
+          <div style={{
+            ...pillStyle,
+            background: streak > 0 ? "#000" : "#e0e0e0",
+            color: streak > 0 ? "#fff" : "#999",
+            boxShadow: streak > 0 ? "0 2px 12px rgba(0,0,0,0.18)" : "none"
+          }}>
+            <span style={{ fontSize: 18 }}>{streak > 0 ? "🔥" : "○"}</span>
+            <span>{streak}</span>
+            <span style={labelStyle}>{streak === 1 ? "day" : "days"}</span>
+          </div>
+        </div>
       </div>
       <div style={{ display: "flex", justifyContent: "space-between", gap: 4, fontFamily: font }}>
         {weekDays.map((dateKey, i) => {
@@ -1511,8 +1502,7 @@ export default function App() {
       minHeight: "100vh", background: "#fff", color: "#000"
     }}>
       <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-      <StreakBadge streak={streak} />
-      <TopBar sessions={sessions} />
+      <TopBar sessions={sessions} streak={streak} />
       <Nav page={page} setPage={setPage} onLogout={handleLogout} />
       {page === PAGES.TIMER && <TimerPage sessions={sessions} setSessions={setSessions} onNewSession={() => {}} />}
       {page === PAGES.ANALYSIS && <AnalysisPage sessions={sessions} />}
