@@ -528,8 +528,6 @@ function TimerPage({ sessions, setSessions }) {
 function TasksPage({ tasks, setTasks }) {
   const [selectedDate, setSelectedDate] = useState(todayStr());
   const [newTask, setNewTask] = useState("");
-  const [showPlanner, setShowPlanner] = useState(false);
-  const [plannerSlots, setPlannerSlots] = useState({});
   const font = "'Nunito', sans-serif";
   const isToday = selectedDate === todayStr();
 
@@ -569,6 +567,9 @@ function TasksPage({ tasks, setTasks }) {
 
   const addPlannerTask = async (slotKey, title) => {
     if (!title.trim()) return;
+    // Only 1 task per slot — check if slot already has one
+    const existing = dayPlannerTasks.find(t => t.time_slot === slotKey);
+    if (existing) return;
     const saved = await insertTask(title.trim(), selectedDate, slotKey);
     if (saved) setTasks(prev => [...prev, saved]);
   };
@@ -587,73 +588,62 @@ function TasksPage({ tasks, setTasks }) {
       {/* Add task */}
       <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
         <input value={newTask} onChange={e => setNewTask(e.target.value)} placeholder="Add a task..." onKeyDown={e => e.key === "Enter" && addTask()}
-          style={{ flex: 1, border: "2px solid #000", padding: "10px 14px", fontSize: 14, fontFamily: font, background: "transparent", outline: "none" }} />
-        <button onClick={addTask} style={{ padding: "10px 20px", border: "2px solid #000", background: "#000", color: "#fff", fontSize: 13, fontFamily: font, fontWeight: 700, cursor: "pointer" }}>+</button>
+          style={{ flex: 1, border: "2px solid #000", padding: "12px 16px", fontSize: 15, fontFamily: font, background: "transparent", outline: "none", fontWeight: 600 }} />
+        <button onClick={addTask} style={{ padding: "12px 22px", border: "2px solid #000", background: "#000", color: "#fff", fontSize: 14, fontFamily: font, fontWeight: 700, cursor: "pointer" }}>+</button>
       </div>
 
       {/* Task list */}
       <div style={{ fontSize: 11, fontFamily: font, textTransform: "uppercase", letterSpacing: "0.15em", color: "#999", marginBottom: 10, fontWeight: 600 }}>Tasks ({dayTasks.filter(t => t.completed_date).length}/{dayTasks.length})</div>
-      {dayTasks.length === 0 && (<div style={{ color: "#ccc", fontFamily: font, fontSize: 13, padding: "20px 0", textAlign: "center" }}>No tasks for this day</div>)}
+      {dayTasks.length === 0 && (<div style={{ color: "#ccc", fontFamily: font, fontSize: 14, padding: "20px 0", textAlign: "center" }}>No tasks for this day</div>)}
       {dayTasks.map(t => {
         const done = !!t.completed_date;
         return (
-          <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 0", borderBottom: "1px solid #f0f0f0", fontFamily: font, fontSize: 14 }}>
-            <button onClick={() => toggleComplete(t)} style={{ width: 24, height: 24, border: done ? "none" : "2px solid #ccc", background: done ? "#2A9D8F" : "transparent", borderRadius: 4, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 14, flexShrink: 0 }}>
+          <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 0", borderBottom: "1px solid #f0f0f0", fontFamily: font, fontSize: 15 }}>
+            <button onClick={() => toggleComplete(t)} style={{ width: 26, height: 26, border: done ? "none" : "2px solid #ccc", background: done ? "#2A9D8F" : "transparent", borderRadius: 6, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 15, flexShrink: 0 }}>
               {done && "✓"}
             </button>
             <span style={{ flex: 1, fontWeight: 600, textDecoration: done ? "line-through" : "none", color: done ? "#999" : "#000" }}>{t.title}</span>
-            <button onClick={() => removeTask(t.id)} style={{ border: "none", background: "none", cursor: "pointer", color: "#ccc", fontSize: 16, padding: "0 4px" }}>✕</button>
+            <button onClick={() => removeTask(t.id)} style={{ border: "none", background: "none", cursor: "pointer", color: "#ccc", fontSize: 18, padding: "0 4px" }}>✕</button>
           </div>
         );
       })}
 
-      {/* Day Planner Toggle */}
-      <div style={{ marginTop: 32, textAlign: "center" }}>
-        <button onClick={() => setShowPlanner(!showPlanner)} style={{
-          border: "2px solid #000", background: showPlanner ? "#000" : "transparent", color: showPlanner ? "#fff" : "#000",
-          padding: "10px 24px", fontSize: 12, fontFamily: font, fontWeight: 700, letterSpacing: "0.06em",
-          textTransform: "uppercase", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 8
-        }}>
-          <span style={{ display: "inline-block", transition: "transform 0.3s ease", transform: showPlanner ? "rotate(180deg)" : "rotate(0deg)", fontSize: 10 }}>▼</span>
-          {showPlanner ? "Hide Day Planner" : "Day Planner"}
-        </button>
-      </div>
-
-      {showPlanner && (
-        <div style={{ marginTop: 20 }}>
-          <div style={{ fontSize: 10, fontFamily: font, textTransform: "uppercase", letterSpacing: "0.12em", color: "#999", marginBottom: 8, fontWeight: 600 }}>Plan your day (4 AM – 12 AM)</div>
-          <div style={{ border: "1px solid #eee", borderRadius: 4, overflow: "hidden" }}>
-            {slots.map(slot => {
-              const slotTasks = dayPlannerTasks.filter(t => t.time_slot === slot.key);
-              return (
-                <div key={slot.key} style={{ display: "flex", borderBottom: "1px solid #f0f0f0", fontFamily: font, fontSize: 11, minHeight: 32 }}>
-                  <div style={{ width: 100, padding: "6px 8px", background: "#f8f8f8", fontWeight: 600, color: "#666", flexShrink: 0, display: "flex", alignItems: "center" }}>{slot.label}</div>
-                  <div style={{ flex: 1, padding: "4px 8px", display: "flex", flexDirection: "column", gap: 2, justifyContent: "center" }}>
-                    {slotTasks.map(t => (
-                      <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                        <button onClick={() => toggleComplete(t)} style={{ width: 16, height: 16, border: t.completed_date ? "none" : "1px solid #ccc", background: t.completed_date ? "#2A9D8F" : "transparent", borderRadius: 3, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 10, flexShrink: 0 }}>{t.completed_date && "✓"}</button>
-                        <span style={{ textDecoration: t.completed_date ? "line-through" : "none", color: t.completed_date ? "#999" : "#000" }}>{t.title}</span>
-                        <button onClick={() => removeTask(t.id)} style={{ border: "none", background: "none", cursor: "pointer", color: "#ccc", fontSize: 12, marginLeft: "auto" }}>✕</button>
-                      </div>
-                    ))}
-                    <PlannerInput slotKey={slot.key} onAdd={(title) => addPlannerTask(slot.key, title)} />
-                  </div>
+      {/* Day Planner — always visible below tasks */}
+      <div style={{ marginTop: 36 }}>
+        <div style={{ fontSize: 11, fontFamily: font, textTransform: "uppercase", letterSpacing: "0.15em", color: "#999", marginBottom: 12, fontWeight: 600 }}>Day Planner</div>
+        <div style={{ border: "2px solid #eee", borderRadius: 6, overflow: "hidden" }}>
+          {slots.map(slot => {
+            const slotTask = dayPlannerTasks.find(t => t.time_slot === slot.key);
+            const done = slotTask && !!slotTask.completed_date;
+            return (
+              <div key={slot.key} style={{ display: "flex", borderBottom: "1px solid #f0f0f0", fontFamily: font, minHeight: 42 }}>
+                <div style={{ width: 120, padding: "10px 12px", background: "#f8f8f8", fontWeight: 600, color: "#555", flexShrink: 0, display: "flex", alignItems: "center", fontSize: 13 }}>{slot.label}</div>
+                <div style={{ flex: 1, padding: "8px 12px", display: "flex", alignItems: "center", gap: 10 }}>
+                  {slotTask ? (
+                    <>
+                      <button onClick={() => toggleComplete(slotTask)} style={{ width: 22, height: 22, border: done ? "none" : "2px solid #ccc", background: done ? "#2A9D8F" : "transparent", borderRadius: 5, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 13, flexShrink: 0 }}>{done && "✓"}</button>
+                      <span style={{ flex: 1, fontSize: 14, fontWeight: 600, textDecoration: done ? "line-through" : "none", color: done ? "#999" : "#000" }}>{slotTask.title}</span>
+                      <button onClick={() => removeTask(slotTask.id)} style={{ border: "none", background: "none", cursor: "pointer", color: "#ccc", fontSize: 16 }}>✕</button>
+                    </>
+                  ) : (
+                    <PlannerSlotInput slotKey={slot.key} onAdd={(title) => addPlannerTask(slot.key, title)} />
+                  )}
                 </div>
-              );
-            })}
-          </div>
+              </div>
+            );
+          })}
         </div>
-      )}
+      </div>
     </div>
   );
 }
 
-function PlannerInput({ slotKey, onAdd }) {
+function PlannerSlotInput({ slotKey, onAdd }) {
   const [val, setVal] = useState("");
   const submit = () => { if (val.trim()) { onAdd(val.trim()); setVal(""); } };
   return (
     <input value={val} onChange={e => setVal(e.target.value)} onKeyDown={e => e.key === "Enter" && submit()}
-      placeholder="+ add" style={{ border: "none", background: "transparent", fontSize: 11, fontFamily: "'Nunito', sans-serif", outline: "none", color: "#bbb", padding: "2px 0", width: "100%" }} />
+      placeholder="+ add task" style={{ border: "none", background: "transparent", fontSize: 13, fontFamily: "'Nunito', sans-serif", fontWeight: 600, outline: "none", color: "#bbb", padding: "4px 0", width: "100%" }} />
   );
 }
 
