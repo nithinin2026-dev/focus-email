@@ -1,8 +1,32 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, createContext, useContext } from "react";
 import * as Tone from "tone";
 import { supabase } from "./supabaseClient";
 
 const PAGES = { TIMER: "timer", TASKS: "tasks", ANALYSIS: "analysis", CALENDAR: "calendar", REFLECTION: "reflection", SLEEP: "sleep" };
+
+
+// ═══════════════════════════════════════════
+// ─── THEME SYSTEM ───
+// ═══════════════════════════════════════════
+const ThemeContext = createContext();
+const THEMES = {
+  light: { bg:"#fff",bgSecondary:"#f6f6f6",bgTertiary:"#f8f8f8",bgHover:"#f0f0f0",text:"#000",textSecondary:"#666",textMuted:"#999",textFaint:"#ccc",border:"#eee",borderMedium:"#ddd",borderStrong:"#000",inputBg:"transparent",navBg:"#fff",navShadow:"0 2px 12px rgba(0,0,0,0.06)",sidebarBg:"#fff",sidebarShadow:"4px 0 24px rgba(0,0,0,0.12)",overlay:"rgba(0,0,0,0.35)",rowGreen:"rgba(42,157,143,0.08)",rowRed:"rgba(230,57,70,0.06)",rowGreenBorder:"rgba(42,157,143,0.2)",rowRedBorder:"rgba(230,57,70,0.15)",calCellBorder:"#333",calEmptyBg:"#fafafa",calHeaderBg:"#f0f0f0",calFutureBg:"#fff",calFutureColor:"#ccc",btnActive:"#000",btnActiveText:"#fff",footerBg:"#E8F4FD",footerColor:"#4A5568",selectBg:"#fff",missedBg:"#fff0f0" },
+  dark: { bg:"#000",bgSecondary:"#111",bgTertiary:"#1a1a1a",bgHover:"#222",text:"#fff",textSecondary:"#aaa",textMuted:"#777",textFaint:"#444",border:"#222",borderMedium:"#333",borderStrong:"#fff",inputBg:"transparent",navBg:"#000",navShadow:"0 2px 12px rgba(0,0,0,0.4)",sidebarBg:"#111",sidebarShadow:"4px 0 24px rgba(0,0,0,0.5)",overlay:"rgba(0,0,0,0.6)",rowGreen:"rgba(42,157,143,0.12)",rowRed:"rgba(230,57,70,0.1)",rowGreenBorder:"rgba(42,157,143,0.3)",rowRedBorder:"rgba(230,57,70,0.25)",calCellBorder:"#444",calEmptyBg:"#0a0a0a",calHeaderBg:"#1a1a1a",calFutureBg:"#111",calFutureColor:"#444",btnActive:"#fff",btnActiveText:"#000",footerBg:"#111",footerColor:"#888",selectBg:"#111",missedBg:"#2a1215" }
+};
+function useTheme() { return useContext(ThemeContext); }
+
+// ─── Theme Toggle ───
+function ThemeToggle({ isDark, onToggle }) {
+  return (
+    <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 4px",fontFamily:"'Nunito', sans-serif" }}>
+      <span style={{ fontSize:12,fontWeight:600,color:isDark?"#aaa":"#666" }}>{isDark?"🌙 Dark":"☀️ Light"}</span>
+      <button onClick={onToggle} style={{ width:44,height:24,borderRadius:12,border:"none",background:isDark?"#fff":"#000",position:"relative",cursor:"pointer",transition:"background 0.3s ease" }}>
+        <div style={{ width:18,height:18,borderRadius:"50%",background:isDark?"#000":"#fff",position:"absolute",top:3,left:isDark?22:4,transition:"left 0.3s ease",boxShadow:"0 1px 3px rgba(0,0,0,0.2)" }} />
+      </button>
+    </div>
+    </ThemeContext.Provider>
+  );
+}
 
 // ─── Responsive hook ───
 function useWindowWidth() {
@@ -172,6 +196,7 @@ function getBarGradient(mins) {
 // ─── TOP NAVBAR ───
 // ═══════════════════════════════════════════
 function TopNavBar({ sessions, streak, todayMins, onMenuClick }) {
+  const T = useTheme();
   const [visible, setVisible] = useState(true);
   const lastScrollY = useRef(0);
   const font = "'Nunito', sans-serif";
@@ -202,17 +227,17 @@ function TopNavBar({ sessions, streak, todayMins, onMenuClick }) {
   return (
     <div style={{
       position: "fixed", top: 0, left: 0, right: 0, zIndex: 1000,
-      background: "#fff", borderBottom: "1px solid #eee",
+      background: T.bg, borderBottom: `1px solid ${T.border}`,
       transform: visible ? "translateY(0)" : "translateY(-100%)",
       transition: "transform 0.35s ease",
       padding: isMobile ? "8px 10px" : "10px 16px",
       display: "flex", alignItems: "center", justifyContent: "space-between",
       fontFamily: font,
-      boxShadow: visible ? "0 2px 12px rgba(0,0,0,0.06)" : "none"
+      boxShadow: visible ? T.navShadow : "none"
     }}>
       <div style={{ display: "flex", alignItems: "center", gap: isMobile ? 6 : 10 }}>
         <button onClick={onMenuClick} style={{ border: "none", background: "none", cursor: "pointer", padding: 4, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#000" strokeWidth="2.5" strokeLinecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={T.text} strokeWidth="2.5" strokeLinecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
         </button>
         <span style={{ fontSize: isMobile ? 11 : 13, fontWeight: 700, display: "flex", alignItems: "center", gap: 4 }}>
           <span>⚡</span><span>{formatHM(maxMins)}</span>
@@ -247,6 +272,7 @@ function TopNavBar({ sessions, streak, todayMins, onMenuClick }) {
 // ─── WEEK STRIP ───
 // ═══════════════════════════════════════════
 function WeekStrip({ sessions }) {
+  const T = useTheme();
   const font = "'Nunito', sans-serif";
   const w = useWindowWidth();
   const isMobile = w < 480;
@@ -284,7 +310,7 @@ function WeekStrip({ sessions }) {
   const size = isMobile ? 36 : 32;
 
   return (
-    <div style={{ background: "#f6f6f6", borderRadius: 10, padding: isMobile ? "10px 10px" : "12px 14px", marginBottom: 20, fontFamily: font }}>
+    <div style={{ background: T.bgSecondary, borderRadius: 10, padding: isMobile ? "10px 10px" : "12px 14px", marginBottom: 20, fontFamily: font }}>
       <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
         <div style={{ display: "flex", justifyContent: "space-between", gap: isMobile ? 4 : 3, flex: 1 }}>
           {weekDays.map((dateKey, i) => {
@@ -322,7 +348,7 @@ function WeekStrip({ sessions }) {
         {editingTarget ? (
           <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
             <input type="date" value={tempTarget} onChange={e => setTempTarget(e.target.value)} style={{ border: "1px solid #ccc", padding: "3px 5px", fontSize: 10, fontFamily: font, outline: "none" }} />
-            <button onClick={saveTarget} style={{ border: "none", background: "#000", color: "#fff", padding: "3px 7px", fontSize: 9, fontFamily: font, fontWeight: 700, cursor: "pointer", borderRadius: 4 }}>Set</button>
+            <button onClick={saveTarget} style={{ border: "none", background: T.btnActive, color: T.btnActiveText, padding: "3px 7px", fontSize: 9, fontFamily: font, fontWeight: 700, cursor: "pointer", borderRadius: 4 }}>Set</button>
           </span>
         ) : (
           <span onDoubleClick={() => { setTempTarget(targetDate || todayStr()); setEditingTarget(true); }} style={{ color: "#6A4C93", cursor: "pointer" }} title="Double-click to set target date">
@@ -337,7 +363,7 @@ function WeekStrip({ sessions }) {
 // ═══════════════════════════════════════════
 // ─── SIDEBAR ───
 // ═══════════════════════════════════════════
-function Sidebar({ open, onClose, page, setPage, sessions, onLogout }) {
+function Sidebar({ open, onClose, page, setPage, sessions, onLogout, isDark, onToggleTheme }) {
   const font = "'Nunito', sans-serif";
   const items = [
     { key: PAGES.TIMER, label: "Timer", icon: "⏱" },
@@ -358,24 +384,24 @@ function Sidebar({ open, onClose, page, setPage, sessions, onLogout }) {
   return (
     <>
       <div onClick={onClose} style={{
-        position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 2000,
+        position: "fixed", inset: 0, background: T.overlay, zIndex: 2000,
         opacity: open ? 1 : 0, pointerEvents: open ? "auto" : "none",
         transition: "opacity 0.3s ease"
       }} />
       <div style={{
         position: "fixed", top: 0, left: 0, bottom: 0, width: 260, zIndex: 2001,
-        background: "#fff", boxShadow: "4px 0 24px rgba(0,0,0,0.12)",
+        background: T.sidebarBg, boxShadow: T.sidebarShadow,
         transform: open ? "translateX(0)" : "translateX(-100%)",
         transition: "transform 0.3s ease",
         display: "flex", flexDirection: "column", fontFamily: font
       }}>
-        <div style={{ padding: "24px 20px 16px", borderBottom: "1px solid #eee" }}>
+        <div style={{ padding: "24px 20px 16px", borderBottom: `1px solid ${T.border}` }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-            <span style={{ fontSize: 18, fontWeight: 800, letterSpacing: "-0.02em" }}>Focus Maxing</span>
+            <span style={{ fontSize: 18, fontWeight: 800, letterSpacing: "-0.02em", color: T.text }}>Focus Maxing</span>
             <button onClick={onClose} style={{ border: "none", background: "none", cursor: "pointer", fontSize: 20, color: "#999", padding: 0 }}>✕</button>
           </div>
           <div style={{ display: "flex", gap: 16, fontSize: 12 }}>
-            <div><div style={{ fontSize: 16, fontWeight: 700 }}>{formatHM(monthMins)}</div><div style={{ color: "#999", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.08em" }}>{monthName}</div></div>
+            <div><div style={{ fontSize: 16, fontWeight: 700 }}>{formatHM(monthMins)}</div><div style={{ color: T.textMuted, fontSize: 10, textTransform: "uppercase", letterSpacing: "0.08em" }}>{monthName}</div></div>
             <div><div style={{ fontSize: 16, fontWeight: 700 }}>{formatHM(yearMins)}</div><div style={{ color: "#999", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.08em" }}>{yearStr}</div></div>
           </div>
         </div>
@@ -386,10 +412,10 @@ function Sidebar({ open, onClose, page, setPage, sessions, onLogout }) {
               <button key={i.key} onClick={() => { setPage(i.key); onClose(); }} style={{
                 display: "flex", alignItems: "center", gap: 12, width: "100%",
                 padding: "14px 24px", border: "none", cursor: "pointer",
-                background: active ? "#f0f0f0" : "transparent",
-                color: "#000", fontSize: 14, fontWeight: active ? 700 : 500,
+                background: active ? T.bgHover : "transparent",
+                color: T.text, fontSize: 14, fontWeight: active ? 700 : 500,
                 fontFamily: font, textAlign: "left", transition: "background 0.15s ease",
-                borderLeft: active ? "3px solid #000" : "3px solid transparent"
+                borderLeft: active ? `3px solid ${T.text}` : "3px solid transparent"
               }}>
                 <span style={{ fontSize: 18 }}>{i.icon}</span>
                 <span>{i.label}</span>
@@ -397,11 +423,12 @@ function Sidebar({ open, onClose, page, setPage, sessions, onLogout }) {
             );
           })}
         </div>
-        <div style={{ padding: "16px 20px", borderTop: "1px solid #eee" }}>
+        <div style={{ padding: "16px 20px", borderTop: `1px solid ${T.border}`, display: "flex", flexDirection: "column", gap: 12 }}>
+          <ThemeToggle isDark={isDark} onToggle={onToggleTheme} />
           <button onClick={onLogout} style={{
-            width: "100%", padding: "10px 0", border: "1px solid #ddd",
+            width: "100%", padding: "10px 0", border: `1px solid ${T.borderMedium}`,
             background: "transparent", cursor: "pointer", fontSize: 11,
-            fontFamily: font, fontWeight: 700, color: "#999",
+            fontFamily: font, fontWeight: 700, color: T.textMuted,
             letterSpacing: "0.06em", textTransform: "uppercase", borderRadius: 6
           }}>Logout</button>
         </div>
@@ -414,6 +441,7 @@ function Sidebar({ open, onClose, page, setPage, sessions, onLogout }) {
 // ─── AUTH ───
 // ═══════════════════════════════════════════
 function AuthPage({ onAuth }) {
+  const T = useTheme();
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -446,7 +474,7 @@ function AuthPage({ onAuth }) {
       <div style={{ fontSize: 48, marginBottom: 16 }}>🔑</div>
       <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 8, textAlign: "center" }}>Reset link sent</div>
       <div style={{ fontSize: 13, color: "#666", textAlign: "center", lineHeight: 1.6, marginBottom: 24 }}>We sent a password reset link to <strong>{email}</strong>.</div>
-      <button onClick={() => { setResetSent(false); setIsLogin(true); }} style={{ border: "2px solid #000", background: "#000", color: "#fff", padding: "12px 32px", fontSize: 13, fontFamily: font, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", cursor: "pointer" }}>Back to Login</button>
+      <button onClick={() => { setResetSent(false); setIsLogin(true); }} style={{ border: `2px solid ${T.borderStrong}`, background: T.btnActive, color: T.btnActiveText, padding: "12px 32px", fontSize: 13, fontFamily: font, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", cursor: "pointer" }}>Back to Login</button>
     </div>
   );
   if (confirmSent) return (
@@ -454,27 +482,27 @@ function AuthPage({ onAuth }) {
       <div style={{ fontSize: 48, marginBottom: 16 }}>✉️</div>
       <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 8, textAlign: "center" }}>Check your email</div>
       <div style={{ fontSize: 13, color: "#666", textAlign: "center", lineHeight: 1.6, marginBottom: 24 }}>We sent a confirmation link to <strong>{email}</strong>.</div>
-      <button onClick={() => { setConfirmSent(false); setIsLogin(true); }} style={{ border: "2px solid #000", background: "#000", color: "#fff", padding: "12px 32px", fontSize: 13, fontFamily: font, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", cursor: "pointer" }}>Back to Login</button>
+      <button onClick={() => { setConfirmSent(false); setIsLogin(true); }} style={{ border: `2px solid ${T.borderStrong}`, background: T.btnActive, color: T.btnActiveText, padding: "12px 32px", fontSize: 13, fontFamily: font, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", cursor: "pointer" }}>Back to Login</button>
     </div>
   );
   return (
     <div style={{ maxWidth: 400, margin: "0 auto", padding: "80px 24px", minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: font }}>
       <div style={{ marginBottom: 40, textAlign: "center" }}>
-        <div style={{ fontSize: 32, fontWeight: 800, letterSpacing: "-0.02em", marginBottom: 4 }}>Focus Maxing</div>
+        <div style={{ fontSize: 32, fontWeight: 800, letterSpacing: "-0.02em", marginBottom: 4, color: T.text }}>Focus Maxing</div>
         <div style={{ fontSize: 12, color: "#999", textTransform: "uppercase", letterSpacing: "0.15em", fontWeight: 600 }}>Track your upskilling</div>
       </div>
       <div style={{ width: "100%", maxWidth: 320 }}>
-        <div style={{ display: "flex", marginBottom: 32, borderBottom: "2px solid #000" }}>
+        <div style={{ display: "flex", marginBottom: 32, borderBottom: `2px solid ${T.borderStrong}` }}>
           {["Login", "Sign Up"].map((label, i) => {
             const active = i === 0 ? isLogin : !isLogin;
             return (<button key={label} onClick={() => { setIsLogin(i === 0); setError(""); }} style={{ flex: 1, padding: "12px 0", border: "none", cursor: "pointer", background: active ? "#000" : "transparent", color: active ? "#fff" : "#000", fontSize: 12, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", fontFamily: font, transition: "all 0.2s ease" }}>{label}</button>);
           })}
         </div>
-        <input value={email} onChange={e => setEmail(e.target.value)} placeholder="Email" type="email" onKeyDown={e => e.key === "Enter" && handleSubmit()} style={{ width: "100%", border: "2px solid #000", padding: "14px 16px", fontSize: 14, fontFamily: font, marginBottom: 12, background: "transparent", outline: "none", fontWeight: 600, boxSizing: "border-box" }} />
-        <input value={password} onChange={e => setPassword(e.target.value)} placeholder="Password" type="password" onKeyDown={e => e.key === "Enter" && handleSubmit()} style={{ width: "100%", border: "2px solid #000", padding: "14px 16px", fontSize: 14, fontFamily: font, marginBottom: 8, background: "transparent", outline: "none", fontWeight: 600, boxSizing: "border-box" }} />
+        <input value={email} onChange={e => setEmail(e.target.value)} placeholder="Email" type="email" onKeyDown={e => e.key === "Enter" && handleSubmit()} style={{ width: "100%", border: `2px solid ${T.borderStrong}`, padding: "14px 16px", fontSize: 14, fontFamily: font, marginBottom: 12, background: "transparent", outline: "none", fontWeight: 600, boxSizing: "border-box" }} />
+        <input value={password} onChange={e => setPassword(e.target.value)} placeholder="Password" type="password" onKeyDown={e => e.key === "Enter" && handleSubmit()} style={{ width: "100%", border: `2px solid ${T.borderStrong}`, padding: "14px 16px", fontSize: 14, fontFamily: font, marginBottom: 8, background: "transparent", outline: "none", fontWeight: 600, boxSizing: "border-box" }} />
         {isLogin && (<div style={{ textAlign: "right", marginBottom: 4 }}><button onClick={handleForgotPassword} style={{ border: "none", background: "none", cursor: "pointer", fontSize: 11, fontFamily: font, fontWeight: 600, color: "#999", textDecoration: "underline", textUnderlineOffset: 3, padding: 0 }}>Forgot Password?</button></div>)}
         {error && (<div style={{ fontSize: 12, color: "#E63946", fontFamily: font, fontWeight: 600, padding: "8px 0", textAlign: "center" }}>{error}</div>)}
-        <button onClick={handleSubmit} disabled={loading} style={{ width: "100%", padding: "14px 0", border: "2px solid #000", background: "#000", color: "#fff", fontSize: 13, fontFamily: font, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", cursor: loading ? "default" : "pointer", marginTop: 16, opacity: loading ? 0.5 : 1 }}>{loading ? "..." : isLogin ? "Login" : "Create Account"}</button>
+        <button onClick={handleSubmit} disabled={loading} style={{ width: "100%", padding: "14px 0", border: `2px solid ${T.borderStrong}`, background: T.btnActive, color: T.btnActiveText, fontSize: 13, fontFamily: font, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", cursor: loading ? "default" : "pointer", marginTop: 16, opacity: loading ? 0.5 : 1 }}>{loading ? "..." : isLogin ? "Login" : "Create Account"}</button>
       </div>
       <div style={{ marginTop: 60, fontSize: 12, color: "#ccc", fontFamily: font, textAlign: "center" }}>Vibe coded by Nithin Chowdary ❤️</div>
     </div>
@@ -483,6 +511,7 @@ function AuthPage({ onAuth }) {
 
 // ─── Timer Page ───
 function TimerPage({ sessions, setSessions }) {
+  const T = useTheme();
   const w = useWindowWidth();
   const isMobile = w < 480;
   const [tag, setTag] = useState(() => sessionStorage.getItem("sl_tag") || "");
@@ -586,17 +615,17 @@ function TimerPage({ sessions, setSessions }) {
   return (
     <div>
       <div style={{ textAlign: "center", marginBottom: 30 }}>
-        <input value={tag} onChange={e => setTag(e.target.value)} placeholder="What are you studying?" style={{ border: "none", borderBottom: "2px solid #000", background: "transparent", fontSize: isMobile ? 16 : 18, fontFamily: "'Nunito', sans-serif", textAlign: "center", padding: "8px 16px", width: "80%", maxWidth: 340, outline: "none", fontWeight: 600 }} />
+        <input value={tag} onChange={e => setTag(e.target.value)} placeholder="What are you studying?" style={{ border: "none", borderBottom: `2px solid ${T.borderStrong}`, background: "transparent", fontSize: isMobile ? 16 : 18, fontFamily: "'Nunito', sans-serif", textAlign: "center", padding: "8px 16px", width: "80%", maxWidth: 340, outline: "none", fontWeight: 600 }} />
       </div>
       {editing ? (
         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, marginBottom: 24, fontFamily: "'Nunito', sans-serif", flexWrap: "wrap" }}>
           <label style={{ fontSize: 12, color: "#666" }}>Focus</label>
-          <input value={tempFocus} onChange={e => setTempFocus(e.target.value)} type="number" style={{ width: 56, border: "2px solid #000", padding: "6px 8px", fontSize: 14, fontFamily: "inherit", textAlign: "center", background: "transparent", outline: "none" }} />
+          <input value={tempFocus} onChange={e => setTempFocus(e.target.value)} type="number" style={{ width: 56, border: `2px solid ${T.borderStrong}`, padding: "6px 8px", fontSize: 14, fontFamily: "inherit", textAlign: "center", background: "transparent", outline: "none" }} />
           <label style={{ fontSize: 12, color: "#666" }}>Break</label>
-          <input value={tempBreak} onChange={e => setTempBreak(e.target.value)} type="number" style={{ width: 56, border: "2px solid #000", padding: "6px 8px", fontSize: 14, fontFamily: "inherit", textAlign: "center", background: "transparent", outline: "none" }} />
+          <input value={tempBreak} onChange={e => setTempBreak(e.target.value)} type="number" style={{ width: 56, border: `2px solid ${T.borderStrong}`, padding: "6px 8px", fontSize: 14, fontFamily: "inherit", textAlign: "center", background: "transparent", outline: "none" }} />
           <span style={{ fontSize: 11, color: "#999" }}>min</span>
-          <button onClick={saveEdit} style={{ border: "2px solid #000", background: "#000", color: "#fff", padding: "6px 14px", fontSize: 12, fontFamily: "inherit", fontWeight: 700, cursor: "pointer" }}>Set</button>
-          <button onClick={() => setEditing(false)} style={{ border: "2px solid #ccc", background: "transparent", color: "#999", padding: "6px 10px", fontSize: 12, fontFamily: "inherit", cursor: "pointer" }}>✕</button>
+          <button onClick={saveEdit} style={{ border: `2px solid ${T.borderStrong}`, background: T.btnActive, color: T.btnActiveText, padding: "6px 14px", fontSize: 12, fontFamily: "inherit", fontWeight: 700, cursor: "pointer" }}>Set</button>
+          <button onClick={() => setEditing(false)} style={{ border: `2px solid ${T.borderMedium}`, background: "transparent", color: "#999", padding: "6px 10px", fontSize: 12, fontFamily: "inherit", cursor: "pointer" }}>✕</button>
         </div>
       ) : (
         <div style={{ textAlign: "center", marginBottom: 20 }}>
@@ -616,17 +645,17 @@ function TimerPage({ sessions, setSessions }) {
         </div>
       </div>
       <div style={{ display: "flex", justifyContent: "center", gap: isMobile ? 8 : 12, marginBottom: 40, flexWrap: "wrap" }}>
-        <button onClick={toggle} style={{ padding: isMobile ? "10px 28px" : "12px 36px", border: "2px solid #000", cursor: "pointer", background: running ? "transparent" : "#000", color: running ? "#000" : "#fff", fontSize: 13, fontFamily: "'Nunito', sans-serif", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", borderRadius: 0, transition: "all 0.2s" }}>{running ? "Pause" : "Start"}</button>
-        <button onClick={reset} style={{ padding: isMobile ? "10px 16px" : "12px 20px", border: "2px solid #ccc", cursor: "pointer", background: "transparent", color: "#999", fontSize: 13, fontFamily: "'Nunito', sans-serif", fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase" }}>Reset</button>
-        <button onClick={skip} style={{ padding: isMobile ? "10px 16px" : "12px 20px", border: "2px solid #ccc", cursor: "pointer", background: "transparent", color: "#999", fontSize: 13, fontFamily: "'Nunito', sans-serif", fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase" }}>Skip</button>
+        <button onClick={toggle} style={{ padding: isMobile ? "10px 28px" : "12px 36px", border: `2px solid ${T.borderStrong}`, cursor: "pointer", background: running ? "transparent" : "#000", color: running ? "#000" : "#fff", fontSize: 13, fontFamily: "'Nunito', sans-serif", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", borderRadius: 0, transition: "all 0.2s" }}>{running ? "Pause" : "Start"}</button>
+        <button onClick={reset} style={{ padding: isMobile ? "10px 16px" : "12px 20px", border: `2px solid ${T.borderMedium}`, cursor: "pointer", background: "transparent", color: "#999", fontSize: 13, fontFamily: "'Nunito', sans-serif", fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase" }}>Reset</button>
+        <button onClick={skip} style={{ padding: isMobile ? "10px 16px" : "12px 20px", border: `2px solid ${T.borderMedium}`, cursor: "pointer", background: "transparent", color: "#999", fontSize: 13, fontFamily: "'Nunito', sans-serif", fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase" }}>Skip</button>
       </div>
-      <div style={{ borderTop: "1px solid #eee", margin: "0 0 30px" }} />
+      <div style={{ borderTop: `1px solid ${T.border}`, margin: "0 0 30px" }} />
       <div style={{ marginBottom: 36 }}>
         <div style={{ fontSize: 11, fontFamily: "'Nunito', sans-serif", textTransform: "uppercase", letterSpacing: "0.15em", color: "#999", marginBottom: 12, fontWeight: 600 }}>Quick Log</div>
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-          <input value={manualTag} onChange={e => setManualTag(e.target.value)} placeholder="Tag" style={{ border: "2px solid #000", padding: "10px 14px", fontSize: 14, fontFamily: "'Nunito', sans-serif", flex: 1, minWidth: 100, background: "transparent", outline: "none", boxSizing: "border-box" }} />
-          <input value={manualMins} onChange={e => setManualMins(e.target.value)} placeholder="mins" type="number" style={{ border: "2px solid #000", padding: "10px 14px", fontSize: 14, fontFamily: "'Nunito', sans-serif", width: 80, background: "transparent", outline: "none", boxSizing: "border-box" }} />
-          <button onClick={logManual} style={{ padding: "10px 20px", border: "2px solid #000", background: "#000", color: "#fff", fontSize: 13, fontFamily: "'Nunito', sans-serif", fontWeight: 700, cursor: "pointer" }}>+</button>
+          <input value={manualTag} onChange={e => setManualTag(e.target.value)} placeholder="Tag" style={{ border: `2px solid ${T.borderStrong}`, padding: "10px 14px", fontSize: 14, fontFamily: "'Nunito', sans-serif", flex: 1, minWidth: 100, background: "transparent", outline: "none", boxSizing: "border-box" }} />
+          <input value={manualMins} onChange={e => setManualMins(e.target.value)} placeholder="mins" type="number" style={{ border: `2px solid ${T.borderStrong}`, padding: "10px 14px", fontSize: 14, fontFamily: "'Nunito', sans-serif", width: 80, background: "transparent", outline: "none", boxSizing: "border-box" }} />
+          <button onClick={logManual} style={{ padding: "10px 20px", border: `2px solid ${T.borderStrong}`, background: T.btnActive, color: T.btnActiveText, fontSize: 13, fontFamily: "'Nunito', sans-serif", fontWeight: 700, cursor: "pointer" }}>+</button>
         </div>
       </div>
       <div>
@@ -636,14 +665,14 @@ function TimerPage({ sessions, setSessions }) {
         </div>
         {todaySessions.length === 0 && (<div style={{ color: "#ccc", fontFamily: "'Nunito', sans-serif", fontSize: 13, padding: "20px 0", textAlign: "center" }}>No sessions yet. Start studying!</div>)}
         {todaySessions.map(s => (
-          <div key={s.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: "1px solid #f0f0f0", fontFamily: "'Nunito', sans-serif", fontSize: 14 }}>
+          <div key={s.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: `1px solid ${T.border}`, fontFamily: "'Nunito', sans-serif", fontSize: 14 }}>
             <span style={{ fontWeight: 600 }}>{s.tag}</span>
             <span style={{ color: "#999" }}>{formatHM(s.duration)}</span>
           </div>
         ))}
       </div>
-      <div style={{ marginTop: 48, padding: "14px 20px", borderRadius: 12, background: "#E8F4FD", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <span style={{ fontSize: 13, fontWeight: 600, color: "#4A5568", letterSpacing: "0.01em" }}>
+      <div style={{ marginTop: 48, padding: "14px 20px", borderRadius: 12, background: T.footerBg, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <span style={{ fontSize: 13, fontWeight: 600, color: T.footerColor, letterSpacing: "0.01em" }}>
           Vibe coded by Nithin Chowdary <span style={{ color: "#E53E3E", fontSize: 15 }}>❤️</span>
         </span>
       </div>
@@ -655,6 +684,7 @@ function TimerPage({ sessions, setSessions }) {
 // ─── Tasks Page ───
 // ═══════════════════════════════════════════
 function TasksPage({ tasks, setTasks }) {
+  const T = useTheme();
   const [selectedDate, setSelectedDate] = useState(todayStr());
   const [newTask, setNewTask] = useState("");
   const w = useWindowWidth();
@@ -680,27 +710,27 @@ function TasksPage({ tasks, setTasks }) {
         <button onClick={() => shiftDate(1)} style={navBtn}>→</button>
       </div>
       <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
-        <input value={newTask} onChange={e => setNewTask(e.target.value)} placeholder="Add a task..." onKeyDown={e => e.key === "Enter" && addTask()} style={{ flex: 1, border: "2px solid #000", padding: "12px 16px", fontSize: 15, fontFamily: font, background: "transparent", outline: "none", fontWeight: 600, boxSizing: "border-box" }} />
-        <button onClick={addTask} style={{ padding: "12px 22px", border: "2px solid #000", background: "#000", color: "#fff", fontSize: 14, fontFamily: font, fontWeight: 700, cursor: "pointer" }}>+</button>
+        <input value={newTask} onChange={e => setNewTask(e.target.value)} placeholder="Add a task..." onKeyDown={e => e.key === "Enter" && addTask()} style={{ flex: 1, border: `2px solid ${T.borderStrong}`, padding: "12px 16px", fontSize: 15, fontFamily: font, background: "transparent", outline: "none", fontWeight: 600, boxSizing: "border-box" }} />
+        <button onClick={addTask} style={{ padding: "12px 22px", border: `2px solid ${T.borderStrong}`, background: T.btnActive, color: T.btnActiveText, fontSize: 14, fontFamily: font, fontWeight: 700, cursor: "pointer" }}>+</button>
       </div>
       <div style={{ fontSize: 11, fontFamily: font, textTransform: "uppercase", letterSpacing: "0.15em", color: "#999", marginBottom: 10, fontWeight: 600 }}>Tasks ({dayTasks.filter(t => t.completed_date).length}/{dayTasks.length})</div>
       {dayTasks.length === 0 && (<div style={{ color: "#ccc", fontFamily: font, fontSize: 14, padding: "20px 0", textAlign: "center" }}>No tasks for this day</div>)}
       {dayTasks.map(t => { const done = !!t.completed_date; return (
-        <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 0", borderBottom: "1px solid #f0f0f0", fontFamily: font, fontSize: 15 }}>
-          <button onClick={() => toggleComplete(t)} style={{ width: 26, height: 26, border: done ? "none" : "2px solid #ccc", background: done ? "#2A9D8F" : "transparent", borderRadius: 6, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 15, flexShrink: 0 }}>{done && "✓"}</button>
+        <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 0", borderBottom: `1px solid ${T.border}`, fontFamily: font, fontSize: 15 }}>
+          <button onClick={() => toggleComplete(t)} style={{ width: 26, height: 26, border: done ? "none" : "2px solid #ccc", background: done ? "#2A9D8F" : "transparent", borderRadius: 6, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: T.btnActiveText, fontSize: 15, flexShrink: 0 }}>{done && "✓"}</button>
           <span style={{ flex: 1, fontWeight: 600, textDecoration: done ? "line-through" : "none", color: done ? "#999" : "#000" }}>{t.title}</span>
           <button onClick={() => removeTask(t.id)} style={{ border: "none", background: "none", cursor: "pointer", color: "#ccc", fontSize: 18, padding: "0 4px" }}>✕</button>
         </div>
       ); })}
       <div style={{ marginTop: 36 }}>
         <div style={{ fontSize: 11, fontFamily: font, textTransform: "uppercase", letterSpacing: "0.15em", color: "#999", marginBottom: 12, fontWeight: 600 }}>Day Planner</div>
-        <div style={{ border: "2px solid #eee", borderRadius: 6, overflow: "hidden" }}>
+        <div style={{ border: `2px solid ${T.border}`, borderRadius: 6, overflow: "hidden" }}>
           {slots.map(slot => { const slotTask = dayPlannerTasks.find(t => t.time_slot === slot.key); const done = slotTask && !!slotTask.completed_date; return (
-            <div key={slot.key} style={{ display: "flex", borderBottom: "1px solid #f0f0f0", fontFamily: font, minHeight: 42 }}>
+            <div key={slot.key} style={{ display: "flex", borderBottom: `1px solid ${T.border}`, fontFamily: font, minHeight: 42 }}>
               <div style={{ width: isMobile ? 90 : 120, padding: isMobile ? "10px 8px" : "10px 12px", background: "#f8f8f8", fontWeight: 600, color: "#555", flexShrink: 0, display: "flex", alignItems: "center", fontSize: isMobile ? 11 : 13 }}>{slot.label}</div>
               <div style={{ flex: 1, padding: "8px 12px", display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
                 {slotTask ? (<>
-                  <button onClick={() => toggleComplete(slotTask)} style={{ width: 22, height: 22, border: done ? "none" : "2px solid #ccc", background: done ? "#2A9D8F" : "transparent", borderRadius: 5, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 13, flexShrink: 0 }}>{done && "✓"}</button>
+                  <button onClick={() => toggleComplete(slotTask)} style={{ width: 22, height: 22, border: done ? "none" : "2px solid #ccc", background: done ? "#2A9D8F" : "transparent", borderRadius: 5, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: T.btnActiveText, fontSize: 13, flexShrink: 0 }}>{done && "✓"}</button>
                   <span style={{ flex: 1, fontSize: 14, fontWeight: 600, textDecoration: done ? "line-through" : "none", color: done ? "#999" : "#000", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{slotTask.title}</span>
                   <button onClick={() => removeTask(slotTask.id)} style={{ border: "none", background: "none", cursor: "pointer", color: "#ccc", fontSize: 16, flexShrink: 0 }}>✕</button>
                 </>) : (<PlannerSlotInput slotKey={slot.key} onAdd={(title) => addPlannerTask(slot.key, title)} />)}
@@ -713,6 +743,7 @@ function TasksPage({ tasks, setTasks }) {
   );
 }
 function PlannerSlotInput({ slotKey, onAdd }) {
+  const T = useTheme();
   const [val, setVal] = useState("");
   const submit = () => { if (val.trim()) { onAdd(val.trim()); setVal(""); } };
   return (<input value={val} onChange={e => setVal(e.target.value)} onKeyDown={e => e.key === "Enter" && submit()} placeholder="+ add task" style={{ border: "none", background: "transparent", fontSize: 13, fontFamily: "'Nunito', sans-serif", fontWeight: 600, outline: "none", color: "#bbb", padding: "4px 0", width: "100%" }} />);
@@ -723,7 +754,7 @@ const TAG_COLORS = ["#E63946","#457B9D","#2A9D8F","#E9C46A","#F4A261","#6A4C93",
 function getTagColor(tag, allTags) { return TAG_COLORS[allTags.indexOf(tag) % TAG_COLORS.length]; }
 function getWeekRange(dateStr) { const d = new Date(dateStr + "T12:00:00"); const mon = new Date(d); mon.setDate(d.getDate() - ((d.getDay() + 6) % 7)); const days = []; for (let i = 0; i < 7; i++) { const dd = new Date(mon); dd.setDate(mon.getDate() + i); days.push(dd.toISOString().slice(0, 10)); } return days; }
 function getMonthDates(year, month) { const n = new Date(year, month + 1, 0).getDate(); const dates = []; for (let d = 1; d <= n; d++) dates.push(`${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`); return dates; }
-function SectionHeader({ children }) { return (<div style={{ fontSize: 11, fontFamily: "'Nunito', sans-serif", textTransform: "uppercase", letterSpacing: "0.15em", color: "#999", marginBottom: 14, fontWeight: 600, marginTop: 40 }}>{children}</div>); }
+function SectionHeader({ children }) { const T = useTheme(); return (<div style={{ fontSize: 11, fontFamily: "'Nunito', sans-serif", textTransform: "uppercase", letterSpacing: "0.15em", color: "#999", marginBottom: 14, fontWeight: 600, marginTop: 40 }}>{children}</div>); }
 function TagBarChart({ sorted, allTags }) {
   if (sorted.length === 0) return null;
   const maxVal = sorted[0][1]; const barH = 160;
@@ -799,6 +830,7 @@ async function exportToExcel(sessions) {
 
 // ─── Analysis Page ───
 function AnalysisPage({ sessions, setSessions }) {
+  const T = useTheme();
   const [selectedDate, setSelectedDate] = useState(todayStr());
   const [showReports, setShowReports] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -839,7 +871,7 @@ function AnalysisPage({ sessions, setSessions }) {
   const bestZone = zones.map(z => ({ ...z, count: Object.values(dayTotalsAll).filter(m => m >= z.min && m < z.max).length })).sort((a, b) => b.count - a.count)[0];
   const navBtn = { border: "none", background: "none", fontSize: 20, cursor: "pointer" };
   const tH = { fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", fontFamily: font };
-  const tR = { display: "grid", padding: "9px 0", borderBottom: "1px solid #f0f0f0", fontFamily: font, fontSize: isMobile ? 12 : 13, alignItems: "center" };
+  const tR = { display: "grid", padding: "9px 0", borderBottom: `1px solid ${T.border}`, fontFamily: font, fontSize: isMobile ? 12 : 13, alignItems: "center" };
   const gridCols = isMobile ? "1fr 80px 60px" : "1fr 100px 80px";
   return (
     <div>
@@ -856,7 +888,7 @@ function AnalysisPage({ sessions, setSessions }) {
       {sorted.length === 0 ? (<div style={{ textAlign: "center", color: "#ccc", fontFamily: font, fontSize: 13, padding: "30px 0" }}>No sessions recorded</div>) : (<TagBarChart sorted={sorted} allTags={allTags} />)}
       {daySessions.length > 0 && (<div style={{ marginTop: 24 }}><div style={{ fontSize: 10, fontFamily: font, textTransform: "uppercase", letterSpacing: "0.12em", color: "#bbb", marginBottom: 8, fontWeight: 600 }}>Session Log</div>{daySessions.map(s => (<div key={s.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "7px 0", borderBottom: "1px solid #f5f5f5", fontFamily: font, fontSize: 13 }}><span style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: getTagColor(s.tag, allTags), display: "inline-block", flexShrink: 0 }} /><span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.tag}</span></span><span style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}><span style={{ color: "#999" }}>{formatHM(s.duration)}</span><button onClick={async () => { await deleteSession(s.id); setSessions(prev => prev.filter(x => x.id !== s.id)); }} style={{ border: "none", background: "none", cursor: "pointer", color: "#ccc", fontSize: 16, padding: "0 2px", lineHeight: 1 }} title="Delete session">✕</button></span></div>))}</div>)}
       <div style={{ marginTop: 32, textAlign: "center" }}>
-        <button onClick={() => setShowReports(!showReports)} style={{ border: "2px solid #000", background: showReports ? "#000" : "transparent", color: showReports ? "#fff" : "#000", padding: "10px 24px", fontSize: 12, fontFamily: font, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 8 }}><span style={{ display: "inline-block", transition: "transform 0.3s ease", transform: showReports ? "rotate(180deg)" : "rotate(0deg)", fontSize: 10 }}>▼</span>{showReports ? "Hide Reports" : "Weekly & Monthly Reports"}</button>
+        <button onClick={() => setShowReports(!showReports)} style={{ border: `2px solid ${T.borderStrong}`, background: showReports ? "#000" : "transparent", color: showReports ? "#fff" : "#000", padding: "10px 24px", fontSize: 12, fontFamily: font, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 8 }}><span style={{ display: "inline-block", transition: "transform 0.3s ease", transform: showReports ? "rotate(180deg)" : "rotate(0deg)", fontSize: 10 }}>▼</span>{showReports ? "Hide Reports" : "Weekly & Monthly Reports"}</button>
       </div>
       <div style={{ maxHeight: showReports ? (reportsRef.current ? reportsRef.current.scrollHeight + "px" : "2000px") : "0px", overflow: "hidden", transition: "max-height 0.5s ease, opacity 0.4s ease", opacity: showReports ? 1 : 0 }}>
         <div ref={reportsRef}>
@@ -869,20 +901,20 @@ function AnalysisPage({ sessions, setSessions }) {
           <PeriodBarChart dates={monthDates} sessions={sessions} />
         </div>
       </div>
-      {personalBests.length > 0 && (<><SectionHeader>🏆 Personal Bests</SectionHeader><div style={{ ...tR, borderBottom: "2px solid #000", padding: "0 0 6px", gridTemplateColumns: gridCols }}><span style={tH}>Category</span><span style={{ ...tH, textAlign: "right" }}>Best</span><span style={{ ...tH, textAlign: "right" }}>Date</span></div>{personalBests.map((b, i) => (<div key={b.tag} style={{ ...tR, gridTemplateColumns: gridCols }}><span style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: getTagColor(b.tag, allTags), display: "inline-block", flexShrink: 0 }} /><span style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{b.tag}</span>{i === 0 && <span style={{ fontSize: 11, flexShrink: 0 }}>👑</span>}</span><span style={{ textAlign: "right", fontWeight: 700, color: "#2A9D8F" }}>{formatHM(b.mins)}</span><span style={{ textAlign: "right", color: "#999", fontSize: 11 }}>{b.date ? new Date(b.date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "—"}</span></div>))}</>)}
+      {personalBests.length > 0 && (<><SectionHeader>🏆 Personal Bests</SectionHeader><div style={{ ...tR, borderBottom: `2px solid ${T.borderStrong}`, padding: "0 0 6px", gridTemplateColumns: gridCols }}><span style={tH}>Category</span><span style={{ ...tH, textAlign: "right" }}>Best</span><span style={{ ...tH, textAlign: "right" }}>Date</span></div>{personalBests.map((b, i) => (<div key={b.tag} style={{ ...tR, gridTemplateColumns: gridCols }}><span style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: getTagColor(b.tag, allTags), display: "inline-block", flexShrink: 0 }} /><span style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{b.tag}</span>{i === 0 && <span style={{ fontSize: 11, flexShrink: 0 }}>👑</span>}</span><span style={{ textAlign: "right", fontWeight: 700, color: "#2A9D8F" }}>{formatHM(b.mins)}</span><span style={{ textAlign: "right", color: "#999", fontSize: 11 }}>{b.date ? new Date(b.date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "—"}</span></div>))}</>)}
       <div style={{ marginTop: 32, textAlign: "center" }}>
-        <button onClick={() => setShowAdvanced(!showAdvanced)} style={{ border: "2px solid #000", background: showAdvanced ? "#000" : "transparent", color: showAdvanced ? "#fff" : "#000", padding: "10px 24px", fontSize: 12, fontFamily: font, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 8 }}><span style={{ display: "inline-block", transition: "transform 0.3s ease", transform: showAdvanced ? "rotate(180deg)" : "rotate(0deg)", fontSize: 10 }}>▼</span>{showAdvanced ? "Hide Advanced" : "Advanced Analysis"}</button>
+        <button onClick={() => setShowAdvanced(!showAdvanced)} style={{ border: `2px solid ${T.borderStrong}`, background: showAdvanced ? "#000" : "transparent", color: showAdvanced ? "#fff" : "#000", padding: "10px 24px", fontSize: 12, fontFamily: font, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 8 }}><span style={{ display: "inline-block", transition: "transform 0.3s ease", transform: showAdvanced ? "rotate(180deg)" : "rotate(0deg)", fontSize: 10 }}>▼</span>{showAdvanced ? "Hide Advanced" : "Advanced Analysis"}</button>
       </div>
       <div style={{ maxHeight: showAdvanced ? (advancedRef.current ? advancedRef.current.scrollHeight + "px" : "3000px") : "0px", overflow: "hidden", transition: "max-height 0.5s ease, opacity 0.4s ease", opacity: showAdvanced ? 1 : 0 }}>
         <div ref={advancedRef}>
           <SectionHeader>Distribution — Hours vs Days</SectionHeader>
           <div style={{ overflowX: "auto", paddingBottom: 8 }}><div style={{ display: "flex", alignItems: "flex-end", gap: 6, minWidth: bucketCounts.length * 56, height: 160, paddingTop: 16 }}>{bucketCounts.map((c, i) => { const h = maxBucket > 0 ? (c.count / maxBucket) * 120 : 0; return (<div key={c.label} style={{ flex: 1, minWidth: 44, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", height: 160 }}><span style={{ fontSize: 11, fontFamily: font, fontWeight: 700, marginBottom: 4, color: distColors[i] }}>{c.count > 0 ? c.count : ""}</span><div style={{ width: "100%", height: h, background: distColors[i], borderRadius: "4px 4px 0 0", transition: "height 0.4s ease", minHeight: c.count > 0 ? 6 : 2, opacity: 0.8 }} /><span style={{ fontSize: 9, fontFamily: font, marginTop: 6, color: "#999" }}>{c.label}</span></div>); })}</div></div>
           <SectionHeader>Focus Insights</SectionHeader>
-          {sessions.length > 0 && (<><div style={{ ...tR, borderBottom: "2px solid #000", padding: "0 0 6px", gridTemplateColumns: gridCols }}><span style={tH}>Insight</span><span style={{ ...tH, textAlign: "right" }}>Value</span><span style={{ ...tH, textAlign: "right" }}>Count</span></div><div style={{ ...tR, gridTemplateColumns: gridCols }}><div><div style={{ fontWeight: 600 }}>Comfort Zone</div><div style={{ fontSize: 10, color: "#999", marginTop: 2 }}>Most consistent range</div></div><span style={{ textAlign: "right", fontWeight: 700, color: "#6A4C93" }}>{bestZone && bestZone.count > 0 ? bestZone.label : "—"}</span><span style={{ textAlign: "right", color: "#666" }}>{bestZone && bestZone.count > 0 ? `${bestZone.count}d` : "—"}</span></div><div style={{ ...tR, gridTemplateColumns: gridCols }}><div><div style={{ fontWeight: 600 }}>Best Focus Day</div><div style={{ fontSize: 10, color: "#999", marginTop: 2 }}>Day you study most</div></div><span style={{ textAlign: "right", fontWeight: 700, color: "#2A9D8F" }}>{bestDow && bestDow.count > 0 ? (isMobile ? dowNames[bestDow.dow].slice(0,3) : dowNames[bestDow.dow]) : "—"}</span><span style={{ textAlign: "right", color: "#666" }}>{bestDow && bestDow.count > 0 ? `${bestDow.count}d` : "—"}</span></div><div style={{ ...tR, gridTemplateColumns: gridCols }}><div><div style={{ fontWeight: 600 }}>Peak Window</div><div style={{ fontSize: 10, color: "#999", marginTop: 2 }}>When you focus most</div></div><span style={{ textAlign: "right", fontWeight: 700, color: "#457B9D", fontSize: isMobile ? 11 : 13 }}>{bestWindow ? bestWindow.label : "—"}</span><span style={{ textAlign: "right", color: "#666" }}>{bestWindow ? `${bestWindow.count}d` : "—"}</span></div></>)}
+          {sessions.length > 0 && (<><div style={{ ...tR, borderBottom: `2px solid ${T.borderStrong}`, padding: "0 0 6px", gridTemplateColumns: gridCols }}><span style={tH}>Insight</span><span style={{ ...tH, textAlign: "right" }}>Value</span><span style={{ ...tH, textAlign: "right" }}>Count</span></div><div style={{ ...tR, gridTemplateColumns: gridCols }}><div><div style={{ fontWeight: 600 }}>Comfort Zone</div><div style={{ fontSize: 10, color: "#999", marginTop: 2 }}>Most consistent range</div></div><span style={{ textAlign: "right", fontWeight: 700, color: "#6A4C93" }}>{bestZone && bestZone.count > 0 ? bestZone.label : "—"}</span><span style={{ textAlign: "right", color: "#666" }}>{bestZone && bestZone.count > 0 ? `${bestZone.count}d` : "—"}</span></div><div style={{ ...tR, gridTemplateColumns: gridCols }}><div><div style={{ fontWeight: 600 }}>Best Focus Day</div><div style={{ fontSize: 10, color: "#999", marginTop: 2 }}>Day you study most</div></div><span style={{ textAlign: "right", fontWeight: 700, color: "#2A9D8F" }}>{bestDow && bestDow.count > 0 ? (isMobile ? dowNames[bestDow.dow].slice(0,3) : dowNames[bestDow.dow]) : "—"}</span><span style={{ textAlign: "right", color: "#666" }}>{bestDow && bestDow.count > 0 ? `${bestDow.count}d` : "—"}</span></div><div style={{ ...tR, gridTemplateColumns: gridCols }}><div><div style={{ fontWeight: 600 }}>Peak Window</div><div style={{ fontSize: 10, color: "#999", marginTop: 2 }}>When you focus most</div></div><span style={{ textAlign: "right", fontWeight: 700, color: "#457B9D", fontSize: isMobile ? 11 : 13 }}>{bestWindow ? bestWindow.label : "—"}</span><span style={{ textAlign: "right", color: "#666" }}>{bestWindow ? `${bestWindow.count}d` : "—"}</span></div></>)}
         </div>
       </div>
       <div style={{ display: "flex", justifyContent: "center", marginTop: 40, marginBottom: 20 }}>
-        <button onClick={() => exportToExcel(sessions)} disabled={sessions.length === 0} style={{ padding: "10px 24px", border: "2px solid #000", background: "#000", color: "#fff", fontSize: 11, fontFamily: font, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", cursor: sessions.length > 0 ? "pointer" : "default", opacity: sessions.length > 0 ? 1 : 0.3, display: "flex", alignItems: "center", gap: 6 }}>↓ Export Excel</button>
+        <button onClick={() => exportToExcel(sessions)} disabled={sessions.length === 0} style={{ padding: "10px 24px", border: `2px solid ${T.borderStrong}`, background: T.btnActive, color: T.btnActiveText, fontSize: 11, fontFamily: font, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", cursor: sessions.length > 0 ? "pointer" : "default", opacity: sessions.length > 0 ? 1 : 0.3, display: "flex", alignItems: "center", gap: 6 }}>↓ Export Excel</button>
       </div>
     </div>
   );
@@ -892,6 +924,7 @@ function AnalysisPage({ sessions, setSessions }) {
 // ─── Calendar Page — RESPONSIVE ───
 // ═══════════════════════════════════════════
 function CalendarPage({ sessions }) {
+  const T = useTheme();
   const currentYear = new Date().getFullYear();
   const [selectedYear, setSelectedYear] = useState(currentYear);
   const [selectedTag, setSelectedTag] = useState("__all__");
@@ -968,30 +1001,30 @@ function CalendarPage({ sessions }) {
             <div key={i} style={{
               height: colCount === 1 ? 28 : 22, display: "flex", alignItems: "center", justifyContent: "center",
               fontSize: headerFontSize, fontWeight: 700, color: "#666",
-              border: "1px solid #000", borderBottom: "2px solid #000",
-              background: "#f0f0f0"
+              border: "1px solid #000", borderBottom: `2px solid ${T.borderStrong}`,
+              background: T.calHeaderBg
             }}>{d}</div>
           ))}
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 0 }}>
           {cells.map((day, i) => {
-            if (day === null) return <div key={`e${i}`} style={{ aspectRatio: "1", border: "0.5px solid #e0e0e0", background: "#fafafa" }} />;
+            if (day === null) return <div key={`e${i}`} style={{ aspectRatio: "1", border: `0.5px solid ${T.border}`, background: T.calEmptyBg }} />;
             const key = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
             const isFire = fireDays.has(key);
             const isFuture = key > todayKey;
             const isToday = isCurrentMonth && day === now.getDate();
             const isMissed = !isFuture && !isFire && key <= todayKey;
 
-            let bg = "#fff";
-            let color = "#000";
+            let bg = T.calFutureBg;
+            let color = T.text;
             if (isFire) { bg = "#2A9D8F"; color = "#fff"; }
             else if (isMissed) { bg = "#E63946"; color = "#fff"; }
-            else if (isFuture) { bg = "#fff"; color = "#ccc"; }
+            else if (isFuture) { bg = T.calFutureBg; color = T.calFutureColor; }
 
             return (
               <div key={i} title={`${key}${dayMinsMap[key] ? " — " + formatHM(dayMinsMap[key]) : ""}`} style={{
                 aspectRatio: "1",
-                border: isToday ? "2.5px solid #000" : "1px solid #333",
+                border: isToday ? `2.5px solid ${T.borderStrong}` : `1px solid ${T.calCellBorder}`,
                 background: bg, color,
                 display: "flex", alignItems: "center", justifyContent: "center",
                 fontSize: cellFontSize, fontWeight: isToday ? 900 : 600,
@@ -1022,14 +1055,14 @@ function CalendarPage({ sessions }) {
     <div style={{ paddingTop: 16, fontFamily: font }}>
       <div style={{ display: "flex", justifyContent: "center", gap: 10, marginBottom: 20, flexWrap: "wrap" }}>
         <select value={selectedYear} onChange={e => setSelectedYear(Number(e.target.value))} style={{
-          border: "2px solid #000", padding: "8px 14px", fontSize: 13, fontFamily: font,
-          fontWeight: 700, background: "#fff", outline: "none", cursor: "pointer", borderRadius: 4
+          border: `2px solid ${T.borderStrong}`, padding: "8px 14px", fontSize: 13, fontFamily: font,
+          fontWeight: 700, background: T.selectBg, color: T.text, outline: "none", cursor: "pointer", borderRadius: 4
         }}>
           {yearOptions.map(y => (<option key={y} value={y}>{y}</option>))}
         </select>
         <select value={selectedTag} onChange={e => setSelectedTag(e.target.value)} style={{
-          border: "2px solid #000", padding: "8px 14px", fontSize: 13, fontFamily: font,
-          fontWeight: 700, background: "#fff", outline: "none", cursor: "pointer", borderRadius: 4,
+          border: `2px solid ${T.borderStrong}`, padding: "8px 14px", fontSize: 13, fontFamily: font,
+          fontWeight: 700, background: T.selectBg, color: T.text, outline: "none", cursor: "pointer", borderRadius: 4,
           maxWidth: w < 480 ? 200 : "none"
         }}>
           <option value="__all__">All — 2h+ goal</option>
@@ -1054,9 +1087,9 @@ function CalendarPage({ sessions }) {
       ))}
 
       <div style={{ display: "flex", justifyContent: "center", gap: 20, fontSize: 11, color: "#555", marginTop: 4, fontWeight: 600, flexWrap: "wrap" }}>
-        <span style={{ display: "flex", alignItems: "center", gap: 5 }}><span style={{ width: 14, height: 14, background: "#2A9D8F", border: "1px solid #000", display: "inline-block" }} /> {isAllMode ? "2h+" : "Studied"}</span>
-        <span style={{ display: "flex", alignItems: "center", gap: 5 }}><span style={{ width: 14, height: 14, background: "#E63946", border: "1px solid #000", display: "inline-block" }} /> Missed</span>
-        <span style={{ display: "flex", alignItems: "center", gap: 5 }}><span style={{ width: 14, height: 14, background: "#fff", border: "1px solid #000", display: "inline-block" }} /> Future</span>
+        <span style={{ display: "flex", alignItems: "center", gap: 5 }}><span style={{ width: 14, height: 14, background: "#2A9D8F", border: `1px solid ${T.calCellBorder}`, display: "inline-block" }} /> {isAllMode ? "2h+" : "Studied"}</span>
+        <span style={{ display: "flex", alignItems: "center", gap: 5 }}><span style={{ width: 14, height: 14, background: "#E63946", border: `1px solid ${T.calCellBorder}`, display: "inline-block" }} /> Missed</span>
+        <span style={{ display: "flex", alignItems: "center", gap: 5 }}><span style={{ width: 14, height: 14, background: "#fff", border: `1px solid ${T.calCellBorder}`, display: "inline-block" }} /> Future</span>
       </div>
     </div>
   );
@@ -1064,6 +1097,7 @@ function CalendarPage({ sessions }) {
 
 // ─── Reflection Page ───
 function ReflectionPage({ sessions }) {
+  const T = useTheme();
   const [reflections, setReflections] = useState({});
   const [loaded, setLoaded] = useState(false);
   const [editingKey, setEditingKey] = useState(null);
@@ -1084,7 +1118,7 @@ function ReflectionPage({ sessions }) {
   return (
     <div>
       <div style={{ fontSize: 11, fontFamily: "'Nunito', sans-serif", textTransform: "uppercase", letterSpacing: "0.15em", color: "#999", marginBottom: 16, fontWeight: 600 }}>Daily Reflection</div>
-      <div style={{ display: "grid", gridTemplateColumns: gridCols, gap: 0, fontFamily: "'Nunito', sans-serif", borderBottom: "2px solid #000", paddingBottom: 8, marginBottom: 4 }}>
+      <div style={{ display: "grid", gridTemplateColumns: gridCols, gap: 0, fontFamily: "'Nunito', sans-serif", borderBottom: `2px solid ${T.borderStrong}`, paddingBottom: 8, marginBottom: 4 }}>
         <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em" }}>Date</span>
         <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em" }}>Notes</span>
         <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", textAlign: "right" }}>Hours</span>
@@ -1101,11 +1135,11 @@ function ReflectionPage({ sessions }) {
           <div key={date} onClick={() => { if (!isEditing) startEdit(date); }} style={{ display: "grid", gridTemplateColumns: gridCols, gap: 0, padding: "10px 0", borderBottom: `1px solid ${rowBorder}`, fontFamily: "'Nunito', sans-serif", fontSize: 13, background: rowBg, cursor: isEditing ? "default" : "pointer", marginLeft: -8, marginRight: -8, paddingLeft: 8, paddingRight: 8, borderRadius: 2 }}>
             <div style={{ display: "flex", flexDirection: "column", justifyContent: "center" }}><span style={{ fontWeight: 700, fontSize: 12 }}>{dayLabel}</span><span style={{ fontSize: 10, color: "#999" }}>{dateLabel}</span></div>
             <div style={{ display: "flex", alignItems: "center", paddingRight: 8, minWidth: 0 }}>
-              {isEditing ? (<div style={{ display: "flex", gap: 6, width: "100%", alignItems: "center" }}><input value={editText} onChange={e => setEditText(e.target.value)} autoFocus placeholder="How was your study?" onKeyDown={e => { if (e.key === "Enter") saveRow(date); if (e.key === "Escape") setEditingKey(null); }} style={{ flex: 1, border: "none", borderBottom: "2px solid #000", background: "transparent", fontSize: 13, fontFamily: "inherit", padding: "4px 0", outline: "none", minWidth: 0 }} /><button onClick={(e) => { e.stopPropagation(); saveRow(date); }} style={{ border: "2px solid #000", background: "#000", color: "#fff", padding: "4px 10px", fontSize: 10, fontFamily: "inherit", fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}>Save</button></div>
+              {isEditing ? (<div style={{ display: "flex", gap: 6, width: "100%", alignItems: "center" }}><input value={editText} onChange={e => setEditText(e.target.value)} autoFocus placeholder="How was your study?" onKeyDown={e => { if (e.key === "Enter") saveRow(date); if (e.key === "Escape") setEditingKey(null); }} style={{ flex: 1, border: "none", borderBottom: `2px solid ${T.borderStrong}`, background: "transparent", fontSize: 13, fontFamily: "inherit", padding: "4px 0", outline: "none", minWidth: 0 }} /><button onClick={(e) => { e.stopPropagation(); saveRow(date); }} style={{ border: `2px solid ${T.borderStrong}`, background: T.btnActive, color: T.btnActiveText, padding: "4px 10px", fontSize: 10, fontFamily: "inherit", fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}>Save</button></div>
               ) : (<span style={{ color: r.note ? "#000" : "#ccc", fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.note || (isToday ? "Tap to add..." : "—")}</span>)}
             </div>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end" }}>
-              {isEditing ? (<input value={editHrs} onChange={e => setEditHrs(e.target.value)} placeholder={hrs.toFixed(1)} type="number" step="0.1" onKeyDown={e => { if (e.key === "Enter") saveRow(date); }} style={{ width: 45, border: "none", borderBottom: "2px solid #000", background: "transparent", fontSize: 13, fontFamily: "inherit", textAlign: "right", padding: "4px 0", outline: "none" }} />
+              {isEditing ? (<input value={editHrs} onChange={e => setEditHrs(e.target.value)} placeholder={hrs.toFixed(1)} type="number" step="0.1" onKeyDown={e => { if (e.key === "Enter") saveRow(date); }} style={{ width: 45, border: "none", borderBottom: `2px solid ${T.borderStrong}`, background: "transparent", fontSize: 13, fontFamily: "inherit", textAlign: "right", padding: "4px 0", outline: "none" }} />
               ) : (<span style={{ fontWeight: 700, color: hrsColor, fontSize: 13 }}>{hrs.toFixed(1)}h</span>)}
             </div>
           </div>
@@ -1123,6 +1157,7 @@ function ReflectionPage({ sessions }) {
 
 // ─── Sleep Page ───
 function SleepPage({ sleepLogs, setSleepLogs }) {
+  const T = useTheme();
   const [sleepStart, setSleepStart] = useState("23:00");
   const [wakeUp, setWakeUp] = useState("06:30");
   const [logDate, setLogDate] = useState(todayStr());
@@ -1148,10 +1183,10 @@ function SleepPage({ sleepLogs, setSleepLogs }) {
     <div>
       <div style={{ fontSize: 11, fontFamily: font, textTransform: "uppercase", letterSpacing: "0.15em", color: "#999", marginBottom: 14, fontWeight: 600 }}>Log Sleep</div>
       <div style={{ display: "flex", gap: 8, alignItems: "flex-end", flexWrap: "wrap", marginBottom: 24 }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: 4, flex: isMobile ? "1 1 45%" : "none" }}><label style={{ fontSize: 10, fontFamily: font, color: "#999", fontWeight: 600 }}>DATE</label><input type="date" value={logDate} onChange={e => setLogDate(e.target.value)} style={{ border: "2px solid #000", padding: "8px 10px", fontSize: 13, fontFamily: font, fontWeight: 600, outline: "none", width: "100%", boxSizing: "border-box" }} /></div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 4, flex: isMobile ? "1 1 22%" : "none" }}><label style={{ fontSize: 10, fontFamily: font, color: "#999", fontWeight: 600 }}>SLEEP</label><input type="time" value={sleepStart} onChange={e => setSleepStart(e.target.value)} style={{ border: "2px solid #000", padding: "8px 10px", fontSize: 13, fontFamily: font, fontWeight: 600, outline: "none", width: "100%", boxSizing: "border-box" }} /></div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 4, flex: isMobile ? "1 1 22%" : "none" }}><label style={{ fontSize: 10, fontFamily: font, color: "#999", fontWeight: 600 }}>WAKE</label><input type="time" value={wakeUp} onChange={e => setWakeUp(e.target.value)} style={{ border: "2px solid #000", padding: "8px 10px", fontSize: 13, fontFamily: font, fontWeight: 600, outline: "none", width: "100%", boxSizing: "border-box" }} /></div>
-        <button onClick={logSleep} style={{ padding: "10px 20px", border: "2px solid #000", background: "#000", color: "#fff", fontSize: 13, fontFamily: font, fontWeight: 700, cursor: "pointer", flex: isMobile ? "1 1 100%" : "none" }}>Log</button>
+        <div style={{ display: "flex", flexDirection: "column", gap: 4, flex: isMobile ? "1 1 45%" : "none" }}><label style={{ fontSize: 10, fontFamily: font, color: "#999", fontWeight: 600 }}>DATE</label><input type="date" value={logDate} onChange={e => setLogDate(e.target.value)} style={{ border: `2px solid ${T.borderStrong}`, padding: "8px 10px", fontSize: 13, fontFamily: font, fontWeight: 600, outline: "none", width: "100%", boxSizing: "border-box" }} /></div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 4, flex: isMobile ? "1 1 22%" : "none" }}><label style={{ fontSize: 10, fontFamily: font, color: "#999", fontWeight: 600 }}>SLEEP</label><input type="time" value={sleepStart} onChange={e => setSleepStart(e.target.value)} style={{ border: `2px solid ${T.borderStrong}`, padding: "8px 10px", fontSize: 13, fontFamily: font, fontWeight: 600, outline: "none", width: "100%", boxSizing: "border-box" }} /></div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 4, flex: isMobile ? "1 1 22%" : "none" }}><label style={{ fontSize: 10, fontFamily: font, color: "#999", fontWeight: 600 }}>WAKE</label><input type="time" value={wakeUp} onChange={e => setWakeUp(e.target.value)} style={{ border: `2px solid ${T.borderStrong}`, padding: "8px 10px", fontSize: 13, fontFamily: font, fontWeight: 600, outline: "none", width: "100%", boxSizing: "border-box" }} /></div>
+        <button onClick={logSleep} style={{ padding: "10px 20px", border: `2px solid ${T.borderStrong}`, background: T.btnActive, color: T.btnActiveText, fontSize: 13, fontFamily: font, fontWeight: 700, cursor: "pointer", flex: isMobile ? "1 1 100%" : "none" }}>Log</button>
       </div>
       <div style={{ fontSize: 11, fontFamily: font, textTransform: "uppercase", letterSpacing: "0.15em", color: "#999", marginBottom: 14, fontWeight: 600, marginTop: 32 }}>Last 14 Days</div>
       <div style={{ overflowX: "auto", paddingBottom: 8 }}><div style={{ display: "flex", alignItems: "flex-end", gap: 4, minWidth: 14 * 36, height: barH + 40, paddingTop: 16 }}>{barData.map(d => { const h = d.mins > 0 ? (d.mins / maxSleep) * barH : 0; const color = d.mins > 0 ? sleepColor(d.mins) : "#f0f0f0"; const dayLabel = new Date(d.date + "T12:00:00").getDate(); return (<div key={d.date} style={{ flex: 1, minWidth: 24, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", height: barH + 40 }}>{d.mins > 0 && <span style={{ fontSize: 9, fontFamily: font, fontWeight: 700, marginBottom: 2, color }}>{formatHM(d.mins)}</span>}<div style={{ width: "100%", height: h, background: color, borderRadius: "3px 3px 0 0", minHeight: d.mins > 0 ? 4 : 2 }} /><span style={{ fontSize: 8, fontFamily: font, marginTop: 3, color: "#999" }}>{dayLabel}</span></div>); })}</div></div>
@@ -1162,16 +1197,16 @@ function SleepPage({ sleepLogs, setSleepLogs }) {
       </div>
       <div style={{ fontSize: 11, fontFamily: font, textTransform: "uppercase", letterSpacing: "0.15em", color: "#999", marginBottom: 14, fontWeight: 600, marginTop: 32 }}>Averages</div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 24 }}>
-        <div style={{ background: "#f8f8f8", padding: "16px", borderRadius: 8, fontFamily: font }}><div style={{ fontSize: 10, color: "#999", textTransform: "uppercase", letterSpacing: "0.1em", fontWeight: 600, marginBottom: 6 }}>Weekly (last 7)</div><div style={{ fontSize: 22, fontWeight: 700 }}>{formatHM(avgSleep)}</div><div style={{ fontSize: 11, color: "#666", marginTop: 6 }}>Bed: {avgBed}</div><div style={{ fontSize: 11, color: "#666" }}>Wake: {avgWake}</div></div>
-        <div style={{ background: "#f8f8f8", padding: "16px", borderRadius: 8, fontFamily: font }}><div style={{ fontSize: 10, color: "#999", textTransform: "uppercase", letterSpacing: "0.1em", fontWeight: 600, marginBottom: 6 }}>Monthly</div><div style={{ fontSize: 22, fontWeight: 700 }}>{formatHM(monthAvg)}</div><div style={{ fontSize: 11, color: "#666", marginTop: 6 }}>{monthLogs.length} nights logged</div></div>
+        <div style={{ background: T.bgTertiary, padding: "16px", borderRadius: 8, fontFamily: font }}><div style={{ fontSize: 10, color: "#999", textTransform: "uppercase", letterSpacing: "0.1em", fontWeight: 600, marginBottom: 6 }}>Weekly (last 7)</div><div style={{ fontSize: 22, fontWeight: 700 }}>{formatHM(avgSleep)}</div><div style={{ fontSize: 11, color: "#666", marginTop: 6 }}>Bed: {avgBed}</div><div style={{ fontSize: 11, color: "#666" }}>Wake: {avgWake}</div></div>
+        <div style={{ background: T.bgTertiary, padding: "16px", borderRadius: 8, fontFamily: font }}><div style={{ fontSize: 10, color: "#999", textTransform: "uppercase", letterSpacing: "0.1em", fontWeight: 600, marginBottom: 6 }}>Monthly</div><div style={{ fontSize: 22, fontWeight: 700 }}>{formatHM(monthAvg)}</div><div style={{ fontSize: 11, color: "#666", marginTop: 6 }}>{monthLogs.length} nights logged</div></div>
       </div>
       <div style={{ fontSize: 11, fontFamily: font, textTransform: "uppercase", letterSpacing: "0.15em", color: "#999", marginBottom: 10, fontWeight: 600 }}>Sleep Log</div>
-      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 60px 60px 60px" : "90px 70px 70px 70px", gap: 0, fontFamily: font, borderBottom: "2px solid #000", paddingBottom: 6, marginBottom: 4 }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 60px 60px 60px" : "90px 70px 70px 70px", gap: 0, fontFamily: font, borderBottom: `2px solid ${T.borderStrong}`, paddingBottom: 6, marginBottom: 4 }}>
         <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em" }}>Date</span><span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em" }}>Sleep</span><span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em" }}>Wake</span><span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", textAlign: "right" }}>Total</span>
       </div>
       {sleepLogs.length === 0 && (<div style={{ color: "#ccc", fontFamily: font, fontSize: 13, padding: "20px 0", textAlign: "center" }}>No sleep logs yet</div>)}
       {sleepLogs.map(l => { const color = sleepColor(l.total_mins || 0); const dayLabel = new Date(l.date + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }); return (
-        <div key={l.id} style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 60px 60px 60px" : "90px 70px 70px 70px", padding: "8px 0", borderBottom: "1px solid #f0f0f0", fontFamily: font, fontSize: isMobile ? 12 : 13 }}>
+        <div key={l.id} style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 60px 60px 60px" : "90px 70px 70px 70px", padding: "8px 0", borderBottom: `1px solid ${T.border}`, fontFamily: font, fontSize: isMobile ? 12 : 13 }}>
           <span style={{ fontWeight: 600, fontSize: 11, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{dayLabel}</span><span style={{ color: "#666" }}>{l.sleep_start || "—"}</span><span style={{ color: "#666" }}>{l.wake_up || "—"}</span><span style={{ textAlign: "right", fontWeight: 700, color }}>{l.total_mins ? formatHM(l.total_mins) : "—"}</span>
         </div>
       ); })}
@@ -1191,6 +1226,9 @@ export default function App() {
   const [sleepLogs, setSleepLogs] = useState([]);
   const [loaded, setLoaded] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isDark, setIsDark] = useState(() => localStorage.getItem("fm_theme") === "dark");
+  const toggleTheme = () => { setIsDark(prev => { const next = !prev; localStorage.setItem("fm_theme", next ? "dark" : "light"); return next; }); };
+  const theme = isDark ? THEMES.dark : THEMES.light;
   const w = useWindowWidth();
 
   useEffect(() => {
@@ -1215,15 +1253,16 @@ export default function App() {
     return w < 480 ? "100%" : 540;
   };
 
-  if (authLoading) return (<div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", fontFamily: "'Nunito', sans-serif", fontSize: 14, color: "#999" }}><link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet" />Loading...</div>);
-  if (!user) return (<><link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet" /><AuthPage onAuth={setUser} /></>);
-  if (!loaded) return (<div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", fontFamily: "'Nunito', sans-serif", fontSize: 14, color: "#999" }}><link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet" />Loading your data...</div>);
+  if (authLoading) return (<ThemeContext.Provider value={theme}><div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", fontFamily: "'Nunito', sans-serif", fontSize: 14, color: theme.textMuted, background: theme.bg }}><link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet" />Loading...</div></ThemeContext.Provider>);
+  if (!user) return (<ThemeContext.Provider value={theme}><link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet" /><AuthPage onAuth={setUser} /></ThemeContext.Provider>);
+  if (!loaded) return (<ThemeContext.Provider value={theme}><div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", fontFamily: "'Nunito', sans-serif", fontSize: 14, color: theme.textMuted, background: theme.bg }}><link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet" />Loading your data...</div></ThemeContext.Provider>);
 
   return (
-    <div style={{ maxWidth: getMaxWidth(), margin: "0 auto", padding: w < 480 ? "56px 12px 60px" : "60px 20px 60px", minHeight: "100vh", background: "#fff", color: "#000", transition: "max-width 0.3s ease" }}>
+    <ThemeContext.Provider value={theme}>
+    <div style={{ maxWidth: getMaxWidth(), margin: "0 auto", padding: w < 480 ? "56px 12px 60px" : "60px 20px 60px", minHeight: "100vh", background: theme.bg, color: theme.text, transition: "all 0.3s ease" }}>
       <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
       <TopNavBar sessions={sessions} streak={streak} todayMins={todayMins} onMenuClick={() => setSidebarOpen(true)} />
-      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} page={page} setPage={setPage} sessions={sessions} onLogout={handleLogout} />
+      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} page={page} setPage={setPage} sessions={sessions} onLogout={handleLogout} isDark={isDark} onToggleTheme={toggleTheme} />
       {page === PAGES.TIMER && <><WeekStrip sessions={sessions} /><TimerPage sessions={sessions} setSessions={setSessions} /></>}
       {page === PAGES.TASKS && <div style={{ paddingTop: 16 }}><TasksPage tasks={tasks} setTasks={setTasks} /></div>}
       {page === PAGES.ANALYSIS && <div style={{ paddingTop: 16 }}><AnalysisPage sessions={sessions} setSessions={setSessions} /></div>}
