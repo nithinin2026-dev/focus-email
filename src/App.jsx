@@ -587,6 +587,7 @@ export default function App(){
   const[isDark,setIsDark]=useState(()=>localStorage.getItem("fm_theme")==="dark");
   const toggleTheme=()=>{setIsDark(p=>{const n=!p;localStorage.setItem("fm_theme",n?"dark":"light");return n;});};
   const theme=isDark?D:L;const w=useWindowWidth();
+  useEffect(()=>{document.body.style.background=theme.bg;document.documentElement.style.background=theme.bg;},[isDark]);
   useEffect(()=>{supabase.auth.getSession().then(({data:{session}})=>{setUser(session?.user??null);setAuthLoading(false);});const{data:{subscription}}=supabase.auth.onAuthStateChange((_e,session)=>{setUser(session?.user??null);});return()=>subscription.unsubscribe();},[]);
   useEffect(()=>{if(!user){setSessions([]);setTasks([]);setSleepLogs([]);setLoaded(false);return;}setLoaded(false);Promise.all([loadSessions(),loadTasks(),loadSleepLogs()]).then(([s,t,sl])=>{setSessions(s);setTasks(t);setSleepLogs(sl);setLoaded(true);});},[user]);
   const handleLogout=async()=>{await supabase.auth.signOut();setUser(null);setSessions([]);setTasks([]);setSleepLogs([]);setLoaded(false);setSidebarOpen(false);};
