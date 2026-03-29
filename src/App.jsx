@@ -24,7 +24,6 @@ function ThemeToggle({ isDark, onToggle }) {
         <div style={{ width:18,height:18,borderRadius:"50%",background:isDark?"#000":"#fff",position:"absolute",top:3,left:isDark?22:4,transition:"left 0.3s ease",boxShadow:"0 1px 3px rgba(0,0,0,0.2)" }} />
       </button>
     </div>
-    </ThemeContext.Provider>
   );
 }
 
@@ -1270,5 +1269,6 @@ export default function App() {
       {page === PAGES.REFLECTION && <div style={{ paddingTop: 16 }}><ReflectionPage sessions={sessions} /></div>}
       {page === PAGES.SLEEP && <div style={{ paddingTop: 16 }}><SleepPage sleepLogs={sleepLogs} setSleepLogs={setSleepLogs} /></div>}
     </div>
+    </ThemeContext.Provider>
   );
 }
