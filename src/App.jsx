@@ -4,6 +4,17 @@ import { supabase } from "./supabaseClient";
 
 const PAGES = { TIMER: "timer", TASKS: "tasks", ANALYSIS: "analysis", CALENDAR: "calendar", REFLECTION: "reflection", SLEEP: "sleep" };
 
+// ─── Responsive hook ───
+function useWindowWidth() {
+  const [width, setWidth] = useState(window.innerWidth);
+  useEffect(() => {
+    const handleResize = () => setWidth(window.innerWidth);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+  return width;
+}
+
 // ─── Quotes ───
 const QUOTES = [
   "Develop the quality of being unstoppable",
@@ -136,13 +147,6 @@ function calcStreak(sessions) {
   }
   return streak;
 }
-function getFireDays(sessions) {
-  const dayTotals = {};
-  sessions.forEach(s => { dayTotals[s.date] = (dayTotals[s.date] || 0) + s.duration; });
-  const fireDays = new Set();
-  Object.entries(dayTotals).forEach(([date, mins]) => { if (mins >= 120) fireDays.add(date); });
-  return fireDays;
-}
 function getDayTotals(sessions) {
   const t = {};
   sessions.forEach(s => { t[s.date] = (t[s.date] || 0) + s.duration; });
@@ -165,12 +169,14 @@ function getBarGradient(mins) {
 }
 
 // ═══════════════════════════════════════════
-// ─── TOP NAVBAR — hides on scroll down, shows on scroll up ───
+// ─── TOP NAVBAR ───
 // ═══════════════════════════════════════════
 function TopNavBar({ sessions, streak, todayMins, onMenuClick }) {
   const [visible, setVisible] = useState(true);
   const lastScrollY = useRef(0);
   const font = "'Nunito', sans-serif";
+  const w = useWindowWidth();
+  const isMobile = w < 480;
 
   useEffect(() => {
     const handleScroll = () => {
@@ -199,38 +205,37 @@ function TopNavBar({ sessions, streak, todayMins, onMenuClick }) {
       background: "#fff", borderBottom: "1px solid #eee",
       transform: visible ? "translateY(0)" : "translateY(-100%)",
       transition: "transform 0.35s ease",
-      padding: "10px 16px",
+      padding: isMobile ? "8px 10px" : "10px 16px",
       display: "flex", alignItems: "center", justifyContent: "space-between",
       fontFamily: font,
       boxShadow: visible ? "0 2px 12px rgba(0,0,0,0.06)" : "none"
     }}>
-      {/* Left: hamburger + max hours */}
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: isMobile ? 6 : 10 }}>
         <button onClick={onMenuClick} style={{ border: "none", background: "none", cursor: "pointer", padding: 4, display: "flex", alignItems: "center", justifyContent: "center" }}>
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#000" strokeWidth="2.5" strokeLinecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
         </button>
-        <span style={{ fontSize: 13, fontWeight: 700, display: "flex", alignItems: "center", gap: 5 }}>
+        <span style={{ fontSize: isMobile ? 11 : 13, fontWeight: 700, display: "flex", alignItems: "center", gap: 4 }}>
           <span>⚡</span><span>{formatHM(maxMins)}</span>
-          <span style={{ fontWeight: 400, fontSize: 10, color: "#999" }}>max</span>
+          <span style={{ fontWeight: 400, fontSize: isMobile ? 8 : 10, color: "#999" }}>max</span>
         </span>
       </div>
 
-      {/* Center: quote */}
-      <div style={{ flex: 1, textAlign: "center", fontSize: 13, fontWeight: 700, color: "#333", fontStyle: "italic", padding: "0 12px", overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>
-        "{QUOTES[quoteIdx]}"
-      </div>
+      {!isMobile && (
+        <div style={{ flex: 1, textAlign: "center", fontSize: 13, fontWeight: 700, color: "#333", fontStyle: "italic", padding: "0 12px", overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>
+          "{QUOTES[quoteIdx]}"
+        </div>
+      )}
 
-      {/* Right: streak */}
       <div style={{
         display: "flex", alignItems: "center", gap: 5,
         background: hitTarget ? (streak > 0 ? "#000" : "#e0e0e0") : "#E63946",
         color: hitTarget ? (streak > 0 ? "#fff" : "#999") : "#fff",
-        padding: "6px 14px", borderRadius: 30,
-        fontSize: 13, fontWeight: 700
+        padding: isMobile ? "5px 10px" : "6px 14px", borderRadius: 30,
+        fontSize: isMobile ? 12 : 13, fontWeight: 700
       }}>
-        <span style={{ fontSize: 16 }}>{hitTarget ? (streak > 0 ? "🔥" : "○") : "⚠️"}</span>
+        <span style={{ fontSize: isMobile ? 14 : 16 }}>{hitTarget ? (streak > 0 ? "🔥" : "○") : "⚠️"}</span>
         <span>{streak}</span>
-        <span style={{ fontWeight: 400, fontSize: 10, opacity: 0.8 }}>
+        <span style={{ fontWeight: 400, fontSize: isMobile ? 8 : 10, opacity: 0.8 }}>
           {hitTarget ? (streak === 1 ? "day" : "days") : "do 2h+"}
         </span>
       </div>
@@ -239,10 +244,12 @@ function TopNavBar({ sessions, streak, todayMins, onMenuClick }) {
 }
 
 // ═══════════════════════════════════════════
-// ─── WEEK BAR + TODAY/TIMER/COUNTDOWN ───
+// ─── WEEK STRIP ───
 // ═══════════════════════════════════════════
 function WeekStrip({ sessions }) {
   const font = "'Nunito', sans-serif";
+  const w = useWindowWidth();
+  const isMobile = w < 480;
   const dayTotals = getDayTotals(sessions);
   const now = new Date();
   const todayKey = todayStr();
@@ -253,18 +260,15 @@ function WeekStrip({ sessions }) {
   const dayLabels = ["M", "T", "W", "TH", "F", "SA", "SU"];
   const weekTotal = weekDays.reduce((a, d) => a + (dayTotals[d] || 0), 0);
 
-  // Today stats
   const todayMins = sessions.filter(s => s.date === todayKey).reduce((a, s) => a + s.duration, 0);
   const todayColor = todayMins >= 240 ? "#2A9D8F" : todayMins >= 120 ? "#F4A261" : "#E63946";
 
-  // Midnight countdown
   const hr = now.getHours();
   const minsLeft = (24 - hr - 1) * 60 + (60 - now.getMinutes());
   const hrsLeft = Math.floor(minsLeft / 60); const mLeft = minsLeft % 60;
   let midColor;
   if (hr < 12) midColor = "#2A9D8F"; else if (hr < 15) midColor = "#F4A261"; else if (hr < 18) midColor = "#E76F51"; else if (hr < 21) midColor = "#E63946"; else midColor = "#C1121F";
 
-  // Target date
   const [targetDate, setTargetDate] = useState(() => localStorage.getItem("sl_targetDate") || "");
   const [editingTarget, setEditingTarget] = useState(false);
   const [tempTarget, setTempTarget] = useState("");
@@ -277,28 +281,28 @@ function WeekStrip({ sessions }) {
     else targetText = `${Math.abs(diff)}d ago`;
   }
 
+  const size = isMobile ? 36 : 32;
+
   return (
-    <div style={{ background: "#f6f6f6", borderRadius: 10, padding: "12px 14px", marginBottom: 20, fontFamily: font }}>
-      {/* Week circles + total */}
+    <div style={{ background: "#f6f6f6", borderRadius: 10, padding: isMobile ? "10px 10px" : "12px 14px", marginBottom: 20, fontFamily: font }}>
       <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 3, flex: 1 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: isMobile ? 4 : 3, flex: 1 }}>
           {weekDays.map((dateKey, i) => {
             const mins = dayTotals[dateKey] || 0;
             const isFire = mins >= 120;
             const isToday = dateKey === todayKey;
             const hasData = mins > 0;
             const isMissed = isPastDate(dateKey) && !isFire && dateKey >= weekDays[0];
-            const size = 32;
             return (
               <div key={dateKey} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, flex: 1 }}>
-                <span style={{ fontSize: 8, fontWeight: 600, letterSpacing: "0.05em", color: isToday ? "#000" : "#bbb", textTransform: "uppercase" }}>{dayLabels[i]}</span>
+                <span style={{ fontSize: isMobile ? 9 : 8, fontWeight: 600, letterSpacing: "0.05em", color: isToday ? "#000" : "#bbb", textTransform: "uppercase" }}>{dayLabels[i]}</span>
                 <div style={{
                   width: size, height: size, borderRadius: "50%",
                   display: "flex", alignItems: "center", justifyContent: "center",
                   background: isFire ? "#000" : isMissed ? "#fff0f0" : isToday ? "#e8e8e8" : "transparent",
                   border: isFire ? "none" : isMissed ? "2px solid #E63946" : hasData ? "2px solid #ddd" : isToday ? "2px solid #ccc" : "2px solid #eee",
                   color: isFire ? "#fff" : isMissed ? "#E63946" : "#999",
-                  fontSize: isFire ? 14 : isMissed ? 12 : 9, fontWeight: 700,
+                  fontSize: isFire ? (isMobile ? 16 : 14) : isMissed ? (isMobile ? 14 : 12) : (isMobile ? 10 : 9), fontWeight: 700,
                   transition: "all 0.2s ease",
                   boxShadow: isFire ? "0 1px 6px rgba(0,0,0,0.15)" : "none"
                 }}>
@@ -308,12 +312,11 @@ function WeekStrip({ sessions }) {
             );
           })}
         </div>
-        <span style={{ fontSize: 13, fontWeight: 700, marginLeft: 6, whiteSpace: "nowrap" }}>{formatHM(weekTotal)}</span>
+        <span style={{ fontSize: isMobile ? 12 : 13, fontWeight: 700, marginLeft: 6, whiteSpace: "nowrap" }}>{formatHM(weekTotal)}</span>
       </div>
 
-      {/* Today hours | countdown | target */}
       <div style={{ borderTop: "1px solid #ddd", marginTop: 2, paddingTop: 10 }} />
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12, fontWeight: 700 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: isMobile ? 11 : 12, fontWeight: 700, flexWrap: "wrap", gap: 6 }}>
         <span style={{ color: todayColor }}>📖 {formatHM(todayMins)} today</span>
         <span style={{ color: midColor }}>⏳ {hrsLeft}h {mLeft}m left</span>
         {editingTarget ? (
@@ -354,13 +357,11 @@ function Sidebar({ open, onClose, page, setPage, sessions, onLogout }) {
 
   return (
     <>
-      {/* Overlay */}
       <div onClick={onClose} style={{
         position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 2000,
         opacity: open ? 1 : 0, pointerEvents: open ? "auto" : "none",
         transition: "opacity 0.3s ease"
       }} />
-      {/* Drawer */}
       <div style={{
         position: "fixed", top: 0, left: 0, bottom: 0, width: 260, zIndex: 2001,
         background: "#fff", boxShadow: "4px 0 24px rgba(0,0,0,0.12)",
@@ -368,20 +369,16 @@ function Sidebar({ open, onClose, page, setPage, sessions, onLogout }) {
         transition: "transform 0.3s ease",
         display: "flex", flexDirection: "column", fontFamily: font
       }}>
-        {/* Header */}
         <div style={{ padding: "24px 20px 16px", borderBottom: "1px solid #eee" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
             <span style={{ fontSize: 18, fontWeight: 800, letterSpacing: "-0.02em" }}>Focus Maxing</span>
             <button onClick={onClose} style={{ border: "none", background: "none", cursor: "pointer", fontSize: 20, color: "#999", padding: 0 }}>✕</button>
           </div>
-          {/* Stats */}
           <div style={{ display: "flex", gap: 16, fontSize: 12 }}>
             <div><div style={{ fontSize: 16, fontWeight: 700 }}>{formatHM(monthMins)}</div><div style={{ color: "#999", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.08em" }}>{monthName}</div></div>
             <div><div style={{ fontSize: 16, fontWeight: 700 }}>{formatHM(yearMins)}</div><div style={{ color: "#999", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.08em" }}>{yearStr}</div></div>
           </div>
         </div>
-
-        {/* Nav items */}
         <div style={{ flex: 1, padding: "12px 0", overflowY: "auto" }}>
           {items.map(i => {
             const active = page === i.key;
@@ -400,8 +397,6 @@ function Sidebar({ open, onClose, page, setPage, sessions, onLogout }) {
             );
           })}
         </div>
-
-        {/* Logout */}
         <div style={{ padding: "16px 20px", borderTop: "1px solid #eee" }}>
           <button onClick={onLogout} style={{
             width: "100%", padding: "10px 0", border: "1px solid #ddd",
@@ -475,8 +470,8 @@ function AuthPage({ onAuth }) {
             return (<button key={label} onClick={() => { setIsLogin(i === 0); setError(""); }} style={{ flex: 1, padding: "12px 0", border: "none", cursor: "pointer", background: active ? "#000" : "transparent", color: active ? "#fff" : "#000", fontSize: 12, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", fontFamily: font, transition: "all 0.2s ease" }}>{label}</button>);
           })}
         </div>
-        <input value={email} onChange={e => setEmail(e.target.value)} placeholder="Email" type="email" onKeyDown={e => e.key === "Enter" && handleSubmit()} style={{ width: "100%", border: "2px solid #000", padding: "14px 16px", fontSize: 14, fontFamily: font, marginBottom: 12, background: "transparent", outline: "none", fontWeight: 600 }} />
-        <input value={password} onChange={e => setPassword(e.target.value)} placeholder="Password" type="password" onKeyDown={e => e.key === "Enter" && handleSubmit()} style={{ width: "100%", border: "2px solid #000", padding: "14px 16px", fontSize: 14, fontFamily: font, marginBottom: 8, background: "transparent", outline: "none", fontWeight: 600 }} />
+        <input value={email} onChange={e => setEmail(e.target.value)} placeholder="Email" type="email" onKeyDown={e => e.key === "Enter" && handleSubmit()} style={{ width: "100%", border: "2px solid #000", padding: "14px 16px", fontSize: 14, fontFamily: font, marginBottom: 12, background: "transparent", outline: "none", fontWeight: 600, boxSizing: "border-box" }} />
+        <input value={password} onChange={e => setPassword(e.target.value)} placeholder="Password" type="password" onKeyDown={e => e.key === "Enter" && handleSubmit()} style={{ width: "100%", border: "2px solid #000", padding: "14px 16px", fontSize: 14, fontFamily: font, marginBottom: 8, background: "transparent", outline: "none", fontWeight: 600, boxSizing: "border-box" }} />
         {isLogin && (<div style={{ textAlign: "right", marginBottom: 4 }}><button onClick={handleForgotPassword} style={{ border: "none", background: "none", cursor: "pointer", fontSize: 11, fontFamily: font, fontWeight: 600, color: "#999", textDecoration: "underline", textUnderlineOffset: 3, padding: 0 }}>Forgot Password?</button></div>)}
         {error && (<div style={{ fontSize: 12, color: "#E63946", fontFamily: font, fontWeight: 600, padding: "8px 0", textAlign: "center" }}>{error}</div>)}
         <button onClick={handleSubmit} disabled={loading} style={{ width: "100%", padding: "14px 0", border: "2px solid #000", background: "#000", color: "#fff", fontSize: 13, fontFamily: font, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", cursor: loading ? "default" : "pointer", marginTop: 16, opacity: loading ? 0.5 : 1 }}>{loading ? "..." : isLogin ? "Login" : "Create Account"}</button>
@@ -488,6 +483,8 @@ function AuthPage({ onAuth }) {
 
 // ─── Timer Page ───
 function TimerPage({ sessions, setSessions }) {
+  const w = useWindowWidth();
+  const isMobile = w < 480;
   const [tag, setTag] = useState(() => sessionStorage.getItem("sl_tag") || "");
   const [running, setRunning] = useState(() => sessionStorage.getItem("sl_running") === "true");
   const [elapsed, setElapsed] = useState(() => {
@@ -549,7 +546,6 @@ function TimerPage({ sessions, setSessions }) {
   useEffect(() => {
     if (remaining <= 0 && running) {
       setRunning(false); playBell();
-      // Push notification
       if ("Notification" in window && Notification.permission === "granted") {
         try { new Notification("Focus Maxing", { body: mode === "focus" ? `${tag || "Focus"} session complete! Time for a break.` : "Break over! Ready to focus again?", icon: "🔥" }); } catch(e) {}
       }
@@ -583,15 +579,17 @@ function TimerPage({ sessions, setSessions }) {
 
   const todaySessions = sessions.filter(s => s.date === todayStr());
   const todayTotal = todaySessions.reduce((a, s) => a + s.duration, 0);
-  const circleR = 90; const circleC = 2 * Math.PI * circleR;
+  const circleSize = isMobile ? 200 : 220;
+  const circleR = isMobile ? 80 : 90;
+  const circleC = 2 * Math.PI * circleR;
 
   return (
     <div>
       <div style={{ textAlign: "center", marginBottom: 30 }}>
-        <input value={tag} onChange={e => setTag(e.target.value)} placeholder="What are you studying?" style={{ border: "none", borderBottom: "2px solid #000", background: "transparent", fontSize: 18, fontFamily: "'Nunito', sans-serif", textAlign: "center", padding: "8px 16px", width: "70%", maxWidth: 340, outline: "none", fontWeight: 600 }} />
+        <input value={tag} onChange={e => setTag(e.target.value)} placeholder="What are you studying?" style={{ border: "none", borderBottom: "2px solid #000", background: "transparent", fontSize: isMobile ? 16 : 18, fontFamily: "'Nunito', sans-serif", textAlign: "center", padding: "8px 16px", width: "80%", maxWidth: 340, outline: "none", fontWeight: 600 }} />
       </div>
       {editing ? (
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, marginBottom: 24, fontFamily: "'Nunito', sans-serif" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, marginBottom: 24, fontFamily: "'Nunito', sans-serif", flexWrap: "wrap" }}>
           <label style={{ fontSize: 12, color: "#666" }}>Focus</label>
           <input value={tempFocus} onChange={e => setTempFocus(e.target.value)} type="number" style={{ width: 56, border: "2px solid #000", padding: "6px 8px", fontSize: 14, fontFamily: "inherit", textAlign: "center", background: "transparent", outline: "none" }} />
           <label style={{ fontSize: 12, color: "#666" }}>Break</label>
@@ -606,28 +604,28 @@ function TimerPage({ sessions, setSessions }) {
         </div>
       )}
       <div style={{ display: "flex", justifyContent: "center", marginBottom: 24 }}>
-        <div style={{ position: "relative", width: 220, height: 220 }}>
-          <svg width={220} height={220} style={{ transform: "rotate(-90deg)" }}>
-            <circle cx={110} cy={110} r={circleR} fill="none" stroke="#eee" strokeWidth={6} />
-            <circle cx={110} cy={110} r={circleR} fill="none" stroke={mode === "focus" ? "#000" : "#888"} strokeWidth={6} strokeLinecap="round" strokeDasharray={circleC} strokeDashoffset={circleC * (1 - progress)} style={{ transition: "stroke-dashoffset 0.3s ease" }} />
+        <div style={{ position: "relative", width: circleSize, height: circleSize }}>
+          <svg width={circleSize} height={circleSize} style={{ transform: "rotate(-90deg)" }}>
+            <circle cx={circleSize/2} cy={circleSize/2} r={circleR} fill="none" stroke="#eee" strokeWidth={6} />
+            <circle cx={circleSize/2} cy={circleSize/2} r={circleR} fill="none" stroke={mode === "focus" ? "#000" : "#888"} strokeWidth={6} strokeLinecap="round" strokeDasharray={circleC} strokeDashoffset={circleC * (1 - progress)} style={{ transition: "stroke-dashoffset 0.3s ease" }} />
           </svg>
           <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
             <div style={{ fontSize: 11, fontFamily: "'Nunito', sans-serif", textTransform: "uppercase", letterSpacing: "0.15em", color: "#999", marginBottom: 4, fontWeight: 600 }}>{mode === "focus" ? "Focus" : "Break"}</div>
-            <div style={{ fontSize: 42, fontFamily: "'Nunito', sans-serif", fontWeight: 700, letterSpacing: "-0.02em" }}>{formatTime(remaining)}</div>
+            <div style={{ fontSize: isMobile ? 36 : 42, fontFamily: "'Nunito', sans-serif", fontWeight: 700, letterSpacing: "-0.02em" }}>{formatTime(remaining)}</div>
           </div>
         </div>
       </div>
-      <div style={{ display: "flex", justifyContent: "center", gap: 12, marginBottom: 40 }}>
-        <button onClick={toggle} style={{ padding: "12px 36px", border: "2px solid #000", cursor: "pointer", background: running ? "transparent" : "#000", color: running ? "#000" : "#fff", fontSize: 13, fontFamily: "'Nunito', sans-serif", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", borderRadius: 0, transition: "all 0.2s" }}>{running ? "Pause" : "Start"}</button>
-        <button onClick={reset} style={{ padding: "12px 20px", border: "2px solid #ccc", cursor: "pointer", background: "transparent", color: "#999", fontSize: 13, fontFamily: "'Nunito', sans-serif", fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase" }}>Reset</button>
-        <button onClick={skip} style={{ padding: "12px 20px", border: "2px solid #ccc", cursor: "pointer", background: "transparent", color: "#999", fontSize: 13, fontFamily: "'Nunito', sans-serif", fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase" }}>Skip</button>
+      <div style={{ display: "flex", justifyContent: "center", gap: isMobile ? 8 : 12, marginBottom: 40, flexWrap: "wrap" }}>
+        <button onClick={toggle} style={{ padding: isMobile ? "10px 28px" : "12px 36px", border: "2px solid #000", cursor: "pointer", background: running ? "transparent" : "#000", color: running ? "#000" : "#fff", fontSize: 13, fontFamily: "'Nunito', sans-serif", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", borderRadius: 0, transition: "all 0.2s" }}>{running ? "Pause" : "Start"}</button>
+        <button onClick={reset} style={{ padding: isMobile ? "10px 16px" : "12px 20px", border: "2px solid #ccc", cursor: "pointer", background: "transparent", color: "#999", fontSize: 13, fontFamily: "'Nunito', sans-serif", fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase" }}>Reset</button>
+        <button onClick={skip} style={{ padding: isMobile ? "10px 16px" : "12px 20px", border: "2px solid #ccc", cursor: "pointer", background: "transparent", color: "#999", fontSize: 13, fontFamily: "'Nunito', sans-serif", fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase" }}>Skip</button>
       </div>
       <div style={{ borderTop: "1px solid #eee", margin: "0 0 30px" }} />
       <div style={{ marginBottom: 36 }}>
         <div style={{ fontSize: 11, fontFamily: "'Nunito', sans-serif", textTransform: "uppercase", letterSpacing: "0.15em", color: "#999", marginBottom: 12, fontWeight: 600 }}>Quick Log</div>
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-          <input value={manualTag} onChange={e => setManualTag(e.target.value)} placeholder="Tag" style={{ border: "2px solid #000", padding: "10px 14px", fontSize: 14, fontFamily: "'Nunito', sans-serif", flex: 1, minWidth: 120, background: "transparent", outline: "none" }} />
-          <input value={manualMins} onChange={e => setManualMins(e.target.value)} placeholder="mins" type="number" style={{ border: "2px solid #000", padding: "10px 14px", fontSize: 14, fontFamily: "'Nunito', sans-serif", width: 80, background: "transparent", outline: "none" }} />
+          <input value={manualTag} onChange={e => setManualTag(e.target.value)} placeholder="Tag" style={{ border: "2px solid #000", padding: "10px 14px", fontSize: 14, fontFamily: "'Nunito', sans-serif", flex: 1, minWidth: 100, background: "transparent", outline: "none", boxSizing: "border-box" }} />
+          <input value={manualMins} onChange={e => setManualMins(e.target.value)} placeholder="mins" type="number" style={{ border: "2px solid #000", padding: "10px 14px", fontSize: 14, fontFamily: "'Nunito', sans-serif", width: 80, background: "transparent", outline: "none", boxSizing: "border-box" }} />
           <button onClick={logManual} style={{ padding: "10px 20px", border: "2px solid #000", background: "#000", color: "#fff", fontSize: 13, fontFamily: "'Nunito', sans-serif", fontWeight: 700, cursor: "pointer" }}>+</button>
         </div>
       </div>
@@ -644,7 +642,6 @@ function TimerPage({ sessions, setSessions }) {
           </div>
         ))}
       </div>
-      {/* Footer only on timer page */}
       <div style={{ marginTop: 48, padding: "14px 20px", borderRadius: 12, background: "#E8F4FD", display: "flex", alignItems: "center", justifyContent: "center" }}>
         <span style={{ fontSize: 13, fontWeight: 600, color: "#4A5568", letterSpacing: "0.01em" }}>
           Vibe coded by Nithin Chowdary <span style={{ color: "#E53E3E", fontSize: 15 }}>❤️</span>
@@ -655,11 +652,13 @@ function TimerPage({ sessions, setSessions }) {
 }
 
 // ═══════════════════════════════════════════
-// ─── Tasks Page (unchanged) ───
+// ─── Tasks Page ───
 // ═══════════════════════════════════════════
 function TasksPage({ tasks, setTasks }) {
   const [selectedDate, setSelectedDate] = useState(todayStr());
   const [newTask, setNewTask] = useState("");
+  const w = useWindowWidth();
+  const isMobile = w < 480;
   const font = "'Nunito', sans-serif";
   const isToday = selectedDate === todayStr();
   const shiftDate = (dir) => { const d = new Date(selectedDate + "T12:00:00"); d.setDate(d.getDate() + dir); setSelectedDate(d.toISOString().slice(0, 10)); };
@@ -681,7 +680,7 @@ function TasksPage({ tasks, setTasks }) {
         <button onClick={() => shiftDate(1)} style={navBtn}>→</button>
       </div>
       <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
-        <input value={newTask} onChange={e => setNewTask(e.target.value)} placeholder="Add a task..." onKeyDown={e => e.key === "Enter" && addTask()} style={{ flex: 1, border: "2px solid #000", padding: "12px 16px", fontSize: 15, fontFamily: font, background: "transparent", outline: "none", fontWeight: 600 }} />
+        <input value={newTask} onChange={e => setNewTask(e.target.value)} placeholder="Add a task..." onKeyDown={e => e.key === "Enter" && addTask()} style={{ flex: 1, border: "2px solid #000", padding: "12px 16px", fontSize: 15, fontFamily: font, background: "transparent", outline: "none", fontWeight: 600, boxSizing: "border-box" }} />
         <button onClick={addTask} style={{ padding: "12px 22px", border: "2px solid #000", background: "#000", color: "#fff", fontSize: 14, fontFamily: font, fontWeight: 700, cursor: "pointer" }}>+</button>
       </div>
       <div style={{ fontSize: 11, fontFamily: font, textTransform: "uppercase", letterSpacing: "0.15em", color: "#999", marginBottom: 10, fontWeight: 600 }}>Tasks ({dayTasks.filter(t => t.completed_date).length}/{dayTasks.length})</div>
@@ -698,12 +697,12 @@ function TasksPage({ tasks, setTasks }) {
         <div style={{ border: "2px solid #eee", borderRadius: 6, overflow: "hidden" }}>
           {slots.map(slot => { const slotTask = dayPlannerTasks.find(t => t.time_slot === slot.key); const done = slotTask && !!slotTask.completed_date; return (
             <div key={slot.key} style={{ display: "flex", borderBottom: "1px solid #f0f0f0", fontFamily: font, minHeight: 42 }}>
-              <div style={{ width: 120, padding: "10px 12px", background: "#f8f8f8", fontWeight: 600, color: "#555", flexShrink: 0, display: "flex", alignItems: "center", fontSize: 13 }}>{slot.label}</div>
-              <div style={{ flex: 1, padding: "8px 12px", display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{ width: isMobile ? 90 : 120, padding: isMobile ? "10px 8px" : "10px 12px", background: "#f8f8f8", fontWeight: 600, color: "#555", flexShrink: 0, display: "flex", alignItems: "center", fontSize: isMobile ? 11 : 13 }}>{slot.label}</div>
+              <div style={{ flex: 1, padding: "8px 12px", display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
                 {slotTask ? (<>
                   <button onClick={() => toggleComplete(slotTask)} style={{ width: 22, height: 22, border: done ? "none" : "2px solid #ccc", background: done ? "#2A9D8F" : "transparent", borderRadius: 5, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 13, flexShrink: 0 }}>{done && "✓"}</button>
-                  <span style={{ flex: 1, fontSize: 14, fontWeight: 600, textDecoration: done ? "line-through" : "none", color: done ? "#999" : "#000" }}>{slotTask.title}</span>
-                  <button onClick={() => removeTask(slotTask.id)} style={{ border: "none", background: "none", cursor: "pointer", color: "#ccc", fontSize: 16 }}>✕</button>
+                  <span style={{ flex: 1, fontSize: 14, fontWeight: 600, textDecoration: done ? "line-through" : "none", color: done ? "#999" : "#000", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{slotTask.title}</span>
+                  <button onClick={() => removeTask(slotTask.id)} style={{ border: "none", background: "none", cursor: "pointer", color: "#ccc", fontSize: 16, flexShrink: 0 }}>✕</button>
                 </>) : (<PlannerSlotInput slotKey={slot.key} onAdd={(title) => addPlannerTask(slot.key, title)} />)}
               </div>
             </div>
@@ -754,7 +753,7 @@ function PeriodBarChart({ dates, sessions }) {
   const isWeekly = dates.length <= 7;
   return (
     <div>
-      <div style={{ display: "flex", gap: 24, marginBottom: 16, fontFamily: "'Nunito', sans-serif" }}>
+      <div style={{ display: "flex", gap: 24, marginBottom: 16, fontFamily: "'Nunito', sans-serif", flexWrap: "wrap" }}>
         {[["Total", totalMins], ["Peak", peakVal], ["Avg/day", avgMins]].map(([label, val]) => (<div key={label}><div style={{ fontSize: 22, fontWeight: 700 }}>{formatHM(val)}</div><div style={{ fontSize: 10, color: "#999", textTransform: "uppercase", letterSpacing: "0.1em" }}>{label}</div></div>))}
       </div>
       <div style={{ position: "relative", overflowX: "auto", paddingBottom: 8 }}>
@@ -769,11 +768,10 @@ function PeriodBarChart({ dates, sessions }) {
           ); })}
         </div>
       </div>
-      <div style={{ display: "flex", gap: 16, marginTop: 12, fontFamily: "'Nunito', sans-serif", fontSize: 10, color: "#999" }}>
+      <div style={{ display: "flex", gap: 16, marginTop: 12, fontFamily: "'Nunito', sans-serif", fontSize: 10, color: "#999", flexWrap: "wrap" }}>
         <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 8, height: 8, background: "#E63946", borderRadius: 2, display: "inline-block" }} /> Peak / &lt;2h</span>
         <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 8, height: 8, background: "#2A9D8F", borderRadius: 2, display: "inline-block" }} /> 2h+</span>
         <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 8, height: 8, background: "#0B6E4F", borderRadius: 2, display: "inline-block" }} /> 4h+</span>
-        <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 12, height: 0, borderTop: "2px dashed #E63946", display: "inline-block" }} /> Peak line</span>
       </div>
     </div>
   );
@@ -806,6 +804,8 @@ function AnalysisPage({ sessions, setSessions }) {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const reportsRef = useRef(null); const advancedRef = useRef(null);
   const [viewMonth, setViewMonth] = useState(() => { const d = new Date(); return { year: d.getFullYear(), month: d.getMonth() }; });
+  const w = useWindowWidth();
+  const isMobile = w < 480;
   const font = "'Nunito', sans-serif";
   const daySessions = sessions.filter(s => s.date === selectedDate);
   const tagTotals = {}; daySessions.forEach(s => { tagTotals[s.tag] = (tagTotals[s.tag] || 0) + s.duration; });
@@ -839,7 +839,8 @@ function AnalysisPage({ sessions, setSessions }) {
   const bestZone = zones.map(z => ({ ...z, count: Object.values(dayTotalsAll).filter(m => m >= z.min && m < z.max).length })).sort((a, b) => b.count - a.count)[0];
   const navBtn = { border: "none", background: "none", fontSize: 20, cursor: "pointer" };
   const tH = { fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", fontFamily: font };
-  const tR = { display: "grid", padding: "9px 0", borderBottom: "1px solid #f0f0f0", fontFamily: font, fontSize: 13, alignItems: "center" };
+  const tR = { display: "grid", padding: "9px 0", borderBottom: "1px solid #f0f0f0", fontFamily: font, fontSize: isMobile ? 12 : 13, alignItems: "center" };
+  const gridCols = isMobile ? "1fr 80px 60px" : "1fr 100px 80px";
   return (
     <div>
       <SectionHeader>Daily Report</SectionHeader>
@@ -853,7 +854,7 @@ function AnalysisPage({ sessions, setSessions }) {
         <div style={{ fontSize: 11, fontFamily: font, textTransform: "uppercase", letterSpacing: "0.15em", color: "#999", marginTop: 4, fontWeight: 600 }}>Total Upskilling {totalMins >= 120 && "🔥"}</div>
       </div>
       {sorted.length === 0 ? (<div style={{ textAlign: "center", color: "#ccc", fontFamily: font, fontSize: 13, padding: "30px 0" }}>No sessions recorded</div>) : (<TagBarChart sorted={sorted} allTags={allTags} />)}
-      {daySessions.length > 0 && (<div style={{ marginTop: 24 }}><div style={{ fontSize: 10, fontFamily: font, textTransform: "uppercase", letterSpacing: "0.12em", color: "#bbb", marginBottom: 8, fontWeight: 600 }}>Session Log</div>{daySessions.map(s => (<div key={s.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "7px 0", borderBottom: "1px solid #f5f5f5", fontFamily: font, fontSize: 13 }}><span style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: getTagColor(s.tag, allTags), display: "inline-block" }} />{s.tag}</span><span style={{ display: "flex", alignItems: "center", gap: 10 }}><span style={{ color: "#999" }}>{formatHM(s.duration)}</span><button onClick={async () => { await deleteSession(s.id); setSessions(prev => prev.filter(x => x.id !== s.id)); }} style={{ border: "none", background: "none", cursor: "pointer", color: "#ccc", fontSize: 16, padding: "0 2px", lineHeight: 1 }} title="Delete session">✕</button></span></div>))}</div>)}
+      {daySessions.length > 0 && (<div style={{ marginTop: 24 }}><div style={{ fontSize: 10, fontFamily: font, textTransform: "uppercase", letterSpacing: "0.12em", color: "#bbb", marginBottom: 8, fontWeight: 600 }}>Session Log</div>{daySessions.map(s => (<div key={s.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "7px 0", borderBottom: "1px solid #f5f5f5", fontFamily: font, fontSize: 13 }}><span style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: getTagColor(s.tag, allTags), display: "inline-block", flexShrink: 0 }} /><span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.tag}</span></span><span style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}><span style={{ color: "#999" }}>{formatHM(s.duration)}</span><button onClick={async () => { await deleteSession(s.id); setSessions(prev => prev.filter(x => x.id !== s.id)); }} style={{ border: "none", background: "none", cursor: "pointer", color: "#ccc", fontSize: 16, padding: "0 2px", lineHeight: 1 }} title="Delete session">✕</button></span></div>))}</div>)}
       <div style={{ marginTop: 32, textAlign: "center" }}>
         <button onClick={() => setShowReports(!showReports)} style={{ border: "2px solid #000", background: showReports ? "#000" : "transparent", color: showReports ? "#fff" : "#000", padding: "10px 24px", fontSize: 12, fontFamily: font, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 8 }}><span style={{ display: "inline-block", transition: "transform 0.3s ease", transform: showReports ? "rotate(180deg)" : "rotate(0deg)", fontSize: 10 }}>▼</span>{showReports ? "Hide Reports" : "Weekly & Monthly Reports"}</button>
       </div>
@@ -861,14 +862,14 @@ function AnalysisPage({ sessions, setSessions }) {
         <div ref={reportsRef}>
           <SectionHeader>Weekly Report — {weekLabel}</SectionHeader>
           <PeriodBarChart dates={weekDates} sessions={sessions} />
-          <div style={{ marginTop: 40, marginBottom: 14, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div style={{ marginTop: 40, marginBottom: 14, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
             <div style={{ fontSize: 11, fontFamily: font, textTransform: "uppercase", letterSpacing: "0.15em", color: "#999", fontWeight: 600 }}>Monthly Report</div>
             <div style={{ display: "flex", alignItems: "center", gap: 12, fontFamily: font }}><button onClick={() => shiftMonth(-1)} style={{ ...navBtn, fontSize: 16 }}>←</button><span style={{ fontSize: 13, fontWeight: 700 }}>{monthLabel}</span><button onClick={() => shiftMonth(1)} style={{ ...navBtn, fontSize: 16 }}>→</button></div>
           </div>
           <PeriodBarChart dates={monthDates} sessions={sessions} />
         </div>
       </div>
-      {personalBests.length > 0 && (<><SectionHeader>🏆 Personal Bests</SectionHeader><div style={{ ...tR, borderBottom: "2px solid #000", padding: "0 0 6px", gridTemplateColumns: "1fr 100px 80px" }}><span style={tH}>Category</span><span style={{ ...tH, textAlign: "right" }}>Best</span><span style={{ ...tH, textAlign: "right" }}>Date</span></div>{personalBests.map((b, i) => (<div key={b.tag} style={{ ...tR, gridTemplateColumns: "1fr 100px 80px" }}><span style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: getTagColor(b.tag, allTags), display: "inline-block" }} /><span style={{ fontWeight: 600 }}>{b.tag}</span>{i === 0 && <span style={{ fontSize: 11 }}>👑</span>}</span><span style={{ textAlign: "right", fontWeight: 700, color: "#2A9D8F" }}>{formatHM(b.mins)}</span><span style={{ textAlign: "right", color: "#999", fontSize: 11 }}>{b.date ? new Date(b.date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "—"}</span></div>))}</>)}
+      {personalBests.length > 0 && (<><SectionHeader>🏆 Personal Bests</SectionHeader><div style={{ ...tR, borderBottom: "2px solid #000", padding: "0 0 6px", gridTemplateColumns: gridCols }}><span style={tH}>Category</span><span style={{ ...tH, textAlign: "right" }}>Best</span><span style={{ ...tH, textAlign: "right" }}>Date</span></div>{personalBests.map((b, i) => (<div key={b.tag} style={{ ...tR, gridTemplateColumns: gridCols }}><span style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: getTagColor(b.tag, allTags), display: "inline-block", flexShrink: 0 }} /><span style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{b.tag}</span>{i === 0 && <span style={{ fontSize: 11, flexShrink: 0 }}>👑</span>}</span><span style={{ textAlign: "right", fontWeight: 700, color: "#2A9D8F" }}>{formatHM(b.mins)}</span><span style={{ textAlign: "right", color: "#999", fontSize: 11 }}>{b.date ? new Date(b.date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "—"}</span></div>))}</>)}
       <div style={{ marginTop: 32, textAlign: "center" }}>
         <button onClick={() => setShowAdvanced(!showAdvanced)} style={{ border: "2px solid #000", background: showAdvanced ? "#000" : "transparent", color: showAdvanced ? "#fff" : "#000", padding: "10px 24px", fontSize: 12, fontFamily: font, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 8 }}><span style={{ display: "inline-block", transition: "transform 0.3s ease", transform: showAdvanced ? "rotate(180deg)" : "rotate(0deg)", fontSize: 10 }}>▼</span>{showAdvanced ? "Hide Advanced" : "Advanced Analysis"}</button>
       </div>
@@ -877,7 +878,7 @@ function AnalysisPage({ sessions, setSessions }) {
           <SectionHeader>Distribution — Hours vs Days</SectionHeader>
           <div style={{ overflowX: "auto", paddingBottom: 8 }}><div style={{ display: "flex", alignItems: "flex-end", gap: 6, minWidth: bucketCounts.length * 56, height: 160, paddingTop: 16 }}>{bucketCounts.map((c, i) => { const h = maxBucket > 0 ? (c.count / maxBucket) * 120 : 0; return (<div key={c.label} style={{ flex: 1, minWidth: 44, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", height: 160 }}><span style={{ fontSize: 11, fontFamily: font, fontWeight: 700, marginBottom: 4, color: distColors[i] }}>{c.count > 0 ? c.count : ""}</span><div style={{ width: "100%", height: h, background: distColors[i], borderRadius: "4px 4px 0 0", transition: "height 0.4s ease", minHeight: c.count > 0 ? 6 : 2, opacity: 0.8 }} /><span style={{ fontSize: 9, fontFamily: font, marginTop: 6, color: "#999" }}>{c.label}</span></div>); })}</div></div>
           <SectionHeader>Focus Insights</SectionHeader>
-          {sessions.length > 0 && (<><div style={{ ...tR, borderBottom: "2px solid #000", padding: "0 0 6px", gridTemplateColumns: "1fr 130px 70px" }}><span style={tH}>Insight</span><span style={{ ...tH, textAlign: "right" }}>Value</span><span style={{ ...tH, textAlign: "right" }}>Count</span></div><div style={{ ...tR, gridTemplateColumns: "1fr 130px 70px" }}><div><div style={{ fontWeight: 600 }}>Comfort Zone</div><div style={{ fontSize: 10, color: "#999", marginTop: 2 }}>Most consistent range</div></div><span style={{ textAlign: "right", fontWeight: 700, color: "#6A4C93" }}>{bestZone && bestZone.count > 0 ? bestZone.label : "—"}</span><span style={{ textAlign: "right", color: "#666" }}>{bestZone && bestZone.count > 0 ? `${bestZone.count} days` : "—"}</span></div><div style={{ ...tR, gridTemplateColumns: "1fr 130px 70px" }}><div><div style={{ fontWeight: 600 }}>Best Focus Day</div><div style={{ fontSize: 10, color: "#999", marginTop: 2 }}>Day you study most often</div></div><span style={{ textAlign: "right", fontWeight: 700, color: "#2A9D8F" }}>{bestDow && bestDow.count > 0 ? dowNames[bestDow.dow] : "—"}</span><span style={{ textAlign: "right", color: "#666" }}>{bestDow && bestDow.count > 0 ? `${bestDow.count} days` : "—"}</span></div><div style={{ ...tR, gridTemplateColumns: "1fr 130px 70px" }}><div><div style={{ fontWeight: 600 }}>Peak Time Window</div><div style={{ fontSize: 10, color: "#999", marginTop: 2 }}>When you focus most</div></div><span style={{ textAlign: "right", fontWeight: 700, color: "#457B9D" }}>{bestWindow ? bestWindow.label : "—"}</span><span style={{ textAlign: "right", color: "#666" }}>{bestWindow ? `${bestWindow.count} days` : "—"}</span></div></>)}
+          {sessions.length > 0 && (<><div style={{ ...tR, borderBottom: "2px solid #000", padding: "0 0 6px", gridTemplateColumns: gridCols }}><span style={tH}>Insight</span><span style={{ ...tH, textAlign: "right" }}>Value</span><span style={{ ...tH, textAlign: "right" }}>Count</span></div><div style={{ ...tR, gridTemplateColumns: gridCols }}><div><div style={{ fontWeight: 600 }}>Comfort Zone</div><div style={{ fontSize: 10, color: "#999", marginTop: 2 }}>Most consistent range</div></div><span style={{ textAlign: "right", fontWeight: 700, color: "#6A4C93" }}>{bestZone && bestZone.count > 0 ? bestZone.label : "—"}</span><span style={{ textAlign: "right", color: "#666" }}>{bestZone && bestZone.count > 0 ? `${bestZone.count}d` : "—"}</span></div><div style={{ ...tR, gridTemplateColumns: gridCols }}><div><div style={{ fontWeight: 600 }}>Best Focus Day</div><div style={{ fontSize: 10, color: "#999", marginTop: 2 }}>Day you study most</div></div><span style={{ textAlign: "right", fontWeight: 700, color: "#2A9D8F" }}>{bestDow && bestDow.count > 0 ? (isMobile ? dowNames[bestDow.dow].slice(0,3) : dowNames[bestDow.dow]) : "—"}</span><span style={{ textAlign: "right", color: "#666" }}>{bestDow && bestDow.count > 0 ? `${bestDow.count}d` : "—"}</span></div><div style={{ ...tR, gridTemplateColumns: gridCols }}><div><div style={{ fontWeight: 600 }}>Peak Window</div><div style={{ fontSize: 10, color: "#999", marginTop: 2 }}>When you focus most</div></div><span style={{ textAlign: "right", fontWeight: 700, color: "#457B9D", fontSize: isMobile ? 11 : 13 }}>{bestWindow ? bestWindow.label : "—"}</span><span style={{ textAlign: "right", color: "#666" }}>{bestWindow ? `${bestWindow.count}d` : "—"}</span></div></>)}
         </div>
       </div>
       <div style={{ display: "flex", justifyContent: "center", marginTop: 40, marginBottom: 20 }}>
@@ -887,16 +888,18 @@ function AnalysisPage({ sessions, setSessions }) {
   );
 }
 
-// ─── Calendar Page (Yearly Heatmap — Excel style, full width) ───
+// ═══════════════════════════════════════════
+// ─── Calendar Page — RESPONSIVE ───
+// ═══════════════════════════════════════════
 function CalendarPage({ sessions }) {
   const currentYear = new Date().getFullYear();
   const [selectedYear, setSelectedYear] = useState(currentYear);
   const [selectedTag, setSelectedTag] = useState("__all__");
   const font = "'Nunito', sans-serif";
+  const w = useWindowWidth();
   const allTags = [...new Set(sessions.map(s => s.tag))].sort();
   const todayKey = todayStr();
 
-  // Build fire days + day totals for selected year
   const fireDays = new Set();
   const dayMinsMap = {};
   if (selectedTag === "__all__") {
@@ -916,10 +919,13 @@ function CalendarPage({ sessions }) {
   }
 
   const isAllMode = selectedTag === "__all__";
-  const dayHeaders = ["M", "T", "W", "Th", "F", "Sa", "Su"];
+  const dayHeaders = ["M", "T", "W", "T", "F", "S", "S"];
   const yearOptions = [];
   for (let y = 2025; y <= 2027; y++) yearOptions.push(y);
   const totalFireDays = fireDays.size;
+
+  // Responsive: 1 col on small mobile, 2 on large mobile/tablet, 3 on desktop
+  const colCount = w < 480 ? 1 : w < 768 ? 2 : 3;
 
   function MonthBlock({ year, month }) {
     const monthNames = ["January","February","March","April","May","June","July","August","September","October","November","December"];
@@ -931,7 +937,6 @@ function CalendarPage({ sessions }) {
     for (let d = 1; d <= daysInMonth; d++) cells.push(d);
     while (cells.length % 7 !== 0) cells.push(null);
 
-    // Avg = total hours this month / total days in month (not just active days)
     let monthTotal = 0;
     for (let d = 1; d <= daysInMonth; d++) {
       const key = `${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
@@ -947,28 +952,27 @@ function CalendarPage({ sessions }) {
 
     const now = new Date();
     const isCurrentMonth = year === now.getFullYear() && month === now.getMonth();
+    const cellFontSize = colCount === 1 ? 14 : colCount === 2 ? 12 : 11;
+    const headerFontSize = colCount === 1 ? 10 : 9;
 
     return (
-      <div style={{ fontFamily: font, flex: 1, minWidth: 0 }}>
-        {/* Month header row */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6, padding: "0 2px" }}>
-          <span style={{ fontSize: 13, fontWeight: 800 }}>{monthNames[month]}</span>
-          <span style={{ fontSize: 11, fontWeight: 700, color: avgMins > 0 ? "#2A9D8F" : "#bbb" }}>
+      <div style={{ fontFamily: font }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8, padding: "0 2px" }}>
+          <span style={{ fontSize: colCount === 1 ? 16 : 13, fontWeight: 800 }}>{monthNames[month]}</span>
+          <span style={{ fontSize: colCount === 1 ? 13 : 11, fontWeight: 700, color: avgMins > 0 ? "#2A9D8F" : "#bbb" }}>
             Avg {formatHM(avgMins)}
           </span>
         </div>
-        {/* Day headers */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 0 }}>
           {dayHeaders.map((d, i) => (
             <div key={i} style={{
-              height: 20, display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 9, fontWeight: 700, color: "#666",
+              height: colCount === 1 ? 28 : 22, display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: headerFontSize, fontWeight: 700, color: "#666",
               border: "1px solid #000", borderBottom: "2px solid #000",
               background: "#f0f0f0"
             }}>{d}</div>
           ))}
         </div>
-        {/* Day cells */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 0 }}>
           {cells.map((day, i) => {
             if (day === null) return <div key={`e${i}`} style={{ aspectRatio: "1", border: "0.5px solid #e0e0e0", background: "#fafafa" }} />;
@@ -990,7 +994,7 @@ function CalendarPage({ sessions }) {
                 border: isToday ? "2.5px solid #000" : "1px solid #333",
                 background: bg, color,
                 display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: 11, fontWeight: isToday ? 900 : 600,
+                fontSize: cellFontSize, fontWeight: isToday ? 900 : 600,
                 cursor: "default",
                 position: "relative",
                 zIndex: isToday ? 2 : 1
@@ -1000,19 +1004,22 @@ function CalendarPage({ sessions }) {
             );
           })}
         </div>
-        {/* Month fire count */}
-        <div style={{ fontSize: 10, color: "#666", marginTop: 6, textAlign: "center", fontWeight: 600 }}>
+        <div style={{ fontSize: colCount === 1 ? 12 : 10, color: "#666", marginTop: 6, textAlign: "center", fontWeight: 600 }}>
           {monthFireCount} 🔥
         </div>
       </div>
     );
   }
 
-  const rows = [[0,1,2],[3,4,5],[6,7,8],[9,10,11]];
+  // Build rows dynamically based on colCount
+  const allMonths = [0,1,2,3,4,5,6,7,8,9,10,11];
+  const rows = [];
+  for (let i = 0; i < 12; i += colCount) {
+    rows.push(allMonths.slice(i, i + colCount));
+  }
 
   return (
     <div style={{ paddingTop: 16, fontFamily: font }}>
-      {/* Controls */}
       <div style={{ display: "flex", justifyContent: "center", gap: 10, marginBottom: 20, flexWrap: "wrap" }}>
         <select value={selectedYear} onChange={e => setSelectedYear(Number(e.target.value))} style={{
           border: "2px solid #000", padding: "8px 14px", fontSize: 13, fontFamily: font,
@@ -1022,28 +1029,31 @@ function CalendarPage({ sessions }) {
         </select>
         <select value={selectedTag} onChange={e => setSelectedTag(e.target.value)} style={{
           border: "2px solid #000", padding: "8px 14px", fontSize: 13, fontFamily: font,
-          fontWeight: 700, background: "#fff", outline: "none", cursor: "pointer", borderRadius: 4
+          fontWeight: 700, background: "#fff", outline: "none", cursor: "pointer", borderRadius: 4,
+          maxWidth: w < 480 ? 200 : "none"
         }}>
           <option value="__all__">All — 2h+ goal</option>
           {allTags.map(tag => (<option key={tag} value={tag}>{tag}</option>))}
         </select>
       </div>
 
-      {/* Year summary */}
       <div style={{ textAlign: "center", marginBottom: 24 }}>
         <span style={{ fontSize: 26, fontWeight: 800 }}>{totalFireDays}</span>
         <span style={{ fontSize: 13, color: "#999", marginLeft: 8, fontWeight: 600 }}>{isAllMode ? "fire days" : `${selectedTag} days`} in {selectedYear}</span>
       </div>
 
-      {/* 4 rows × 3 months — full width */}
       {rows.map((monthGroup, rowIdx) => (
-        <div key={rowIdx} style={{ display: "flex", gap: 12, marginBottom: 24 }}>
+        <div key={rowIdx} style={{
+          display: "grid",
+          gridTemplateColumns: `repeat(${colCount}, 1fr)`,
+          gap: colCount === 1 ? 20 : 12,
+          marginBottom: colCount === 1 ? 12 : 24
+        }}>
           {monthGroup.map(m => (<MonthBlock key={m} year={selectedYear} month={m} />))}
         </div>
       ))}
 
-      {/* Legend */}
-      <div style={{ display: "flex", justifyContent: "center", gap: 20, fontSize: 11, color: "#555", marginTop: 4, fontWeight: 600 }}>
+      <div style={{ display: "flex", justifyContent: "center", gap: 20, fontSize: 11, color: "#555", marginTop: 4, fontWeight: 600, flexWrap: "wrap" }}>
         <span style={{ display: "flex", alignItems: "center", gap: 5 }}><span style={{ width: 14, height: 14, background: "#2A9D8F", border: "1px solid #000", display: "inline-block" }} /> {isAllMode ? "2h+" : "Studied"}</span>
         <span style={{ display: "flex", alignItems: "center", gap: 5 }}><span style={{ width: 14, height: 14, background: "#E63946", border: "1px solid #000", display: "inline-block" }} /> Missed</span>
         <span style={{ display: "flex", alignItems: "center", gap: 5 }}><span style={{ width: 14, height: 14, background: "#fff", border: "1px solid #000", display: "inline-block" }} /> Future</span>
@@ -1058,6 +1068,8 @@ function ReflectionPage({ sessions }) {
   const [loaded, setLoaded] = useState(false);
   const [editingKey, setEditingKey] = useState(null);
   const [editText, setEditText] = useState(""); const [editHrs, setEditHrs] = useState("");
+  const w = useWindowWidth();
+  const isMobile = w < 480;
   useEffect(() => { loadReflections().then(data => { setReflections(data); setLoaded(true); }); }, []);
   const saveReflection = async (date, note, hrsOverride) => { setReflections(prev => ({ ...prev, [date]: { note, hrsOverride } })); await upsertReflection(date, note, hrsOverride); };
   const dayTotals = getDayTotals(sessions);
@@ -1067,11 +1079,12 @@ function ReflectionPage({ sessions }) {
   const saveRow = (date) => { const hrsVal = editHrs.trim() !== "" ? parseFloat(editHrs) : null; saveReflection(date, editText, hrsVal); setEditingKey(null); };
   const getHours = (date) => { const r = reflections[date]; if (r && r.hrsOverride != null) return r.hrsOverride; return (dayTotals[date] || 0) / 60; };
   const getMins = (date) => { const r = reflections[date]; if (r && r.hrsOverride != null) return Math.round(r.hrsOverride * 60); return dayTotals[date] || 0; };
+  const gridCols = isMobile ? "70px 1fr 55px" : "90px 1fr 70px";
   if (!loaded) return (<div style={{ textAlign: "center", padding: "40px 0", fontFamily: "'Nunito', sans-serif", color: "#999", fontSize: 13 }}>Loading...</div>);
   return (
     <div>
       <div style={{ fontSize: 11, fontFamily: "'Nunito', sans-serif", textTransform: "uppercase", letterSpacing: "0.15em", color: "#999", marginBottom: 16, fontWeight: 600 }}>Daily Reflection</div>
-      <div style={{ display: "grid", gridTemplateColumns: "90px 1fr 70px", gap: 0, fontFamily: "'Nunito', sans-serif", borderBottom: "2px solid #000", paddingBottom: 8, marginBottom: 4 }}>
+      <div style={{ display: "grid", gridTemplateColumns: gridCols, gap: 0, fontFamily: "'Nunito', sans-serif", borderBottom: "2px solid #000", paddingBottom: 8, marginBottom: 4 }}>
         <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em" }}>Date</span>
         <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em" }}>Notes</span>
         <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", textAlign: "right" }}>Hours</span>
@@ -1085,24 +1098,24 @@ function ReflectionPage({ sessions }) {
         const rowBorder = isGreen ? "rgba(42,157,143,0.2)" : "rgba(230,57,70,0.15)";
         const hrsColor = isGreen ? "#2A9D8F" : "#E63946";
         return (
-          <div key={date} onClick={() => { if (!isEditing) startEdit(date); }} style={{ display: "grid", gridTemplateColumns: "90px 1fr 70px", gap: 0, padding: "10px 0", borderBottom: `1px solid ${rowBorder}`, fontFamily: "'Nunito', sans-serif", fontSize: 13, background: rowBg, cursor: isEditing ? "default" : "pointer", marginLeft: -8, marginRight: -8, paddingLeft: 8, paddingRight: 8, borderRadius: 2 }}>
+          <div key={date} onClick={() => { if (!isEditing) startEdit(date); }} style={{ display: "grid", gridTemplateColumns: gridCols, gap: 0, padding: "10px 0", borderBottom: `1px solid ${rowBorder}`, fontFamily: "'Nunito', sans-serif", fontSize: 13, background: rowBg, cursor: isEditing ? "default" : "pointer", marginLeft: -8, marginRight: -8, paddingLeft: 8, paddingRight: 8, borderRadius: 2 }}>
             <div style={{ display: "flex", flexDirection: "column", justifyContent: "center" }}><span style={{ fontWeight: 700, fontSize: 12 }}>{dayLabel}</span><span style={{ fontSize: 10, color: "#999" }}>{dateLabel}</span></div>
-            <div style={{ display: "flex", alignItems: "center", paddingRight: 8 }}>
-              {isEditing ? (<div style={{ display: "flex", gap: 6, width: "100%", alignItems: "center" }}><input value={editText} onChange={e => setEditText(e.target.value)} autoFocus placeholder="How was your study?" onKeyDown={e => { if (e.key === "Enter") saveRow(date); if (e.key === "Escape") setEditingKey(null); }} style={{ flex: 1, border: "none", borderBottom: "2px solid #000", background: "transparent", fontSize: 13, fontFamily: "inherit", padding: "4px 0", outline: "none" }} /><button onClick={(e) => { e.stopPropagation(); saveRow(date); }} style={{ border: "2px solid #000", background: "#000", color: "#fff", padding: "4px 10px", fontSize: 10, fontFamily: "inherit", fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>Save</button></div>
-              ) : (<span style={{ color: r.note ? "#000" : "#ccc", fontSize: 13 }}>{r.note || (isToday ? "Click to add today's reflection..." : "—")}</span>)}
+            <div style={{ display: "flex", alignItems: "center", paddingRight: 8, minWidth: 0 }}>
+              {isEditing ? (<div style={{ display: "flex", gap: 6, width: "100%", alignItems: "center" }}><input value={editText} onChange={e => setEditText(e.target.value)} autoFocus placeholder="How was your study?" onKeyDown={e => { if (e.key === "Enter") saveRow(date); if (e.key === "Escape") setEditingKey(null); }} style={{ flex: 1, border: "none", borderBottom: "2px solid #000", background: "transparent", fontSize: 13, fontFamily: "inherit", padding: "4px 0", outline: "none", minWidth: 0 }} /><button onClick={(e) => { e.stopPropagation(); saveRow(date); }} style={{ border: "2px solid #000", background: "#000", color: "#fff", padding: "4px 10px", fontSize: 10, fontFamily: "inherit", fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}>Save</button></div>
+              ) : (<span style={{ color: r.note ? "#000" : "#ccc", fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.note || (isToday ? "Tap to add..." : "—")}</span>)}
             </div>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end" }}>
-              {isEditing ? (<input value={editHrs} onChange={e => setEditHrs(e.target.value)} placeholder={hrs.toFixed(1)} type="number" step="0.1" onKeyDown={e => { if (e.key === "Enter") saveRow(date); }} style={{ width: 50, border: "none", borderBottom: "2px solid #000", background: "transparent", fontSize: 13, fontFamily: "inherit", textAlign: "right", padding: "4px 0", outline: "none" }} />
+              {isEditing ? (<input value={editHrs} onChange={e => setEditHrs(e.target.value)} placeholder={hrs.toFixed(1)} type="number" step="0.1" onKeyDown={e => { if (e.key === "Enter") saveRow(date); }} style={{ width: 45, border: "none", borderBottom: "2px solid #000", background: "transparent", fontSize: 13, fontFamily: "inherit", textAlign: "right", padding: "4px 0", outline: "none" }} />
               ) : (<span style={{ fontWeight: 700, color: hrsColor, fontSize: 13 }}>{hrs.toFixed(1)}h</span>)}
             </div>
           </div>
         );
       })}
       {allDates.length === 0 && (<div style={{ textAlign: "center", color: "#ccc", fontFamily: "'Nunito', sans-serif", fontSize: 13, padding: "40px 0" }}>No data yet. Start logging sessions!</div>)}
-      <div style={{ display: "flex", gap: 20, marginTop: 20, fontFamily: "'Nunito', sans-serif", fontSize: 10, color: "#999" }}>
+      <div style={{ display: "flex", gap: 16, marginTop: 20, fontFamily: "'Nunito', sans-serif", fontSize: 10, color: "#999", flexWrap: "wrap" }}>
         <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 10, height: 10, background: "rgba(42,157,143,0.15)", border: "1px solid rgba(42,157,143,0.3)", display: "inline-block", borderRadius: 2 }} /> 2h+</span>
         <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 10, height: 10, background: "rgba(230,57,70,0.1)", border: "1px solid rgba(230,57,70,0.2)", display: "inline-block", borderRadius: 2 }} /> &lt;2h</span>
-        <span>Click row to edit</span>
+        <span>Tap row to edit</span>
       </div>
     </div>
   );
@@ -1113,6 +1126,8 @@ function SleepPage({ sleepLogs, setSleepLogs }) {
   const [sleepStart, setSleepStart] = useState("23:00");
   const [wakeUp, setWakeUp] = useState("06:30");
   const [logDate, setLogDate] = useState(todayStr());
+  const w = useWindowWidth();
+  const isMobile = w < 480;
   const font = "'Nunito', sans-serif";
   const calcSleepMins = (start, wake) => { const [sh, sm] = start.split(":").map(Number); const [wh, wm] = wake.split(":").map(Number); let startMin = sh * 60 + sm; let wakeMin = wh * 60 + wm; if (wakeMin <= startMin) wakeMin += 1440; return wakeMin - startMin; };
   const logSleep = async () => { const totalMins = calcSleepMins(sleepStart, wakeUp); const saved = await upsertSleepLog(logDate, sleepStart, wakeUp, totalMins); if (saved) { setSleepLogs(prev => { const filtered = prev.filter(l => l.date !== logDate); return [saved, ...filtered].sort((a, b) => b.date.localeCompare(a.date)); }); } };
@@ -1132,15 +1147,15 @@ function SleepPage({ sleepLogs, setSleepLogs }) {
   return (
     <div>
       <div style={{ fontSize: 11, fontFamily: font, textTransform: "uppercase", letterSpacing: "0.15em", color: "#999", marginBottom: 14, fontWeight: 600 }}>Log Sleep</div>
-      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 24 }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}><label style={{ fontSize: 10, fontFamily: font, color: "#999", fontWeight: 600 }}>DATE</label><input type="date" value={logDate} onChange={e => setLogDate(e.target.value)} style={{ border: "2px solid #000", padding: "8px 10px", fontSize: 13, fontFamily: font, fontWeight: 600, outline: "none" }} /></div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}><label style={{ fontSize: 10, fontFamily: font, color: "#999", fontWeight: 600 }}>SLEEP</label><input type="time" value={sleepStart} onChange={e => setSleepStart(e.target.value)} style={{ border: "2px solid #000", padding: "8px 10px", fontSize: 13, fontFamily: font, fontWeight: 600, outline: "none" }} /></div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}><label style={{ fontSize: 10, fontFamily: font, color: "#999", fontWeight: 600 }}>WAKE UP</label><input type="time" value={wakeUp} onChange={e => setWakeUp(e.target.value)} style={{ border: "2px solid #000", padding: "8px 10px", fontSize: 13, fontFamily: font, fontWeight: 600, outline: "none" }} /></div>
-        <button onClick={logSleep} style={{ padding: "10px 20px", border: "2px solid #000", background: "#000", color: "#fff", fontSize: 13, fontFamily: font, fontWeight: 700, cursor: "pointer", alignSelf: "flex-end" }}>Log</button>
+      <div style={{ display: "flex", gap: 8, alignItems: "flex-end", flexWrap: "wrap", marginBottom: 24 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 4, flex: isMobile ? "1 1 45%" : "none" }}><label style={{ fontSize: 10, fontFamily: font, color: "#999", fontWeight: 600 }}>DATE</label><input type="date" value={logDate} onChange={e => setLogDate(e.target.value)} style={{ border: "2px solid #000", padding: "8px 10px", fontSize: 13, fontFamily: font, fontWeight: 600, outline: "none", width: "100%", boxSizing: "border-box" }} /></div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 4, flex: isMobile ? "1 1 22%" : "none" }}><label style={{ fontSize: 10, fontFamily: font, color: "#999", fontWeight: 600 }}>SLEEP</label><input type="time" value={sleepStart} onChange={e => setSleepStart(e.target.value)} style={{ border: "2px solid #000", padding: "8px 10px", fontSize: 13, fontFamily: font, fontWeight: 600, outline: "none", width: "100%", boxSizing: "border-box" }} /></div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 4, flex: isMobile ? "1 1 22%" : "none" }}><label style={{ fontSize: 10, fontFamily: font, color: "#999", fontWeight: 600 }}>WAKE</label><input type="time" value={wakeUp} onChange={e => setWakeUp(e.target.value)} style={{ border: "2px solid #000", padding: "8px 10px", fontSize: 13, fontFamily: font, fontWeight: 600, outline: "none", width: "100%", boxSizing: "border-box" }} /></div>
+        <button onClick={logSleep} style={{ padding: "10px 20px", border: "2px solid #000", background: "#000", color: "#fff", fontSize: 13, fontFamily: font, fontWeight: 700, cursor: "pointer", flex: isMobile ? "1 1 100%" : "none" }}>Log</button>
       </div>
       <div style={{ fontSize: 11, fontFamily: font, textTransform: "uppercase", letterSpacing: "0.15em", color: "#999", marginBottom: 14, fontWeight: 600, marginTop: 32 }}>Last 14 Days</div>
       <div style={{ overflowX: "auto", paddingBottom: 8 }}><div style={{ display: "flex", alignItems: "flex-end", gap: 4, minWidth: 14 * 36, height: barH + 40, paddingTop: 16 }}>{barData.map(d => { const h = d.mins > 0 ? (d.mins / maxSleep) * barH : 0; const color = d.mins > 0 ? sleepColor(d.mins) : "#f0f0f0"; const dayLabel = new Date(d.date + "T12:00:00").getDate(); return (<div key={d.date} style={{ flex: 1, minWidth: 24, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", height: barH + 40 }}>{d.mins > 0 && <span style={{ fontSize: 9, fontFamily: font, fontWeight: 700, marginBottom: 2, color }}>{formatHM(d.mins)}</span>}<div style={{ width: "100%", height: h, background: color, borderRadius: "3px 3px 0 0", minHeight: d.mins > 0 ? 4 : 2 }} /><span style={{ fontSize: 8, fontFamily: font, marginTop: 3, color: "#999" }}>{dayLabel}</span></div>); })}</div></div>
-      <div style={{ display: "flex", gap: 16, marginTop: 8, fontFamily: font, fontSize: 10, color: "#999" }}>
+      <div style={{ display: "flex", gap: 16, marginTop: 8, fontFamily: font, fontSize: 10, color: "#999", flexWrap: "wrap" }}>
         <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 8, height: 8, background: "#F4A261", borderRadius: 2, display: "inline-block" }} /> &lt;6h</span>
         <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 8, height: 8, background: "#2A9D8F", borderRadius: 2, display: "inline-block" }} /> 6–7.5h</span>
         <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 8, height: 8, background: "#E63946", borderRadius: 2, display: "inline-block" }} /> 7.5h+</span>
@@ -1151,13 +1166,13 @@ function SleepPage({ sleepLogs, setSleepLogs }) {
         <div style={{ background: "#f8f8f8", padding: "16px", borderRadius: 8, fontFamily: font }}><div style={{ fontSize: 10, color: "#999", textTransform: "uppercase", letterSpacing: "0.1em", fontWeight: 600, marginBottom: 6 }}>Monthly</div><div style={{ fontSize: 22, fontWeight: 700 }}>{formatHM(monthAvg)}</div><div style={{ fontSize: 11, color: "#666", marginTop: 6 }}>{monthLogs.length} nights logged</div></div>
       </div>
       <div style={{ fontSize: 11, fontFamily: font, textTransform: "uppercase", letterSpacing: "0.15em", color: "#999", marginBottom: 10, fontWeight: 600 }}>Sleep Log</div>
-      <div style={{ display: "grid", gridTemplateColumns: "90px 70px 70px 70px", gap: 0, fontFamily: font, borderBottom: "2px solid #000", paddingBottom: 6, marginBottom: 4 }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 60px 60px 60px" : "90px 70px 70px 70px", gap: 0, fontFamily: font, borderBottom: "2px solid #000", paddingBottom: 6, marginBottom: 4 }}>
         <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em" }}>Date</span><span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em" }}>Sleep</span><span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em" }}>Wake</span><span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", textAlign: "right" }}>Total</span>
       </div>
       {sleepLogs.length === 0 && (<div style={{ color: "#ccc", fontFamily: font, fontSize: 13, padding: "20px 0", textAlign: "center" }}>No sleep logs yet</div>)}
       {sleepLogs.map(l => { const color = sleepColor(l.total_mins || 0); const dayLabel = new Date(l.date + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }); return (
-        <div key={l.id} style={{ display: "grid", gridTemplateColumns: "90px 70px 70px 70px", padding: "8px 0", borderBottom: "1px solid #f0f0f0", fontFamily: font, fontSize: 13 }}>
-          <span style={{ fontWeight: 600, fontSize: 11 }}>{dayLabel}</span><span style={{ color: "#666" }}>{l.sleep_start || "—"}</span><span style={{ color: "#666" }}>{l.wake_up || "—"}</span><span style={{ textAlign: "right", fontWeight: 700, color }}>{l.total_mins ? formatHM(l.total_mins) : "—"}</span>
+        <div key={l.id} style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 60px 60px 60px" : "90px 70px 70px 70px", padding: "8px 0", borderBottom: "1px solid #f0f0f0", fontFamily: font, fontSize: isMobile ? 12 : 13 }}>
+          <span style={{ fontWeight: 600, fontSize: 11, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{dayLabel}</span><span style={{ color: "#666" }}>{l.sleep_start || "—"}</span><span style={{ color: "#666" }}>{l.wake_up || "—"}</span><span style={{ textAlign: "right", fontWeight: 700, color }}>{l.total_mins ? formatHM(l.total_mins) : "—"}</span>
         </div>
       ); })}
     </div>
@@ -1176,6 +1191,7 @@ export default function App() {
   const [sleepLogs, setSleepLogs] = useState([]);
   const [loaded, setLoaded] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const w = useWindowWidth();
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => { setUser(session?.user ?? null); setAuthLoading(false); });
@@ -1193,12 +1209,18 @@ export default function App() {
   const streak = calcStreak(sessions);
   const todayMins = sessions.filter(s => s.date === todayStr()).reduce((a, s) => a + s.duration, 0);
 
+  // Responsive max width — calendar gets more room
+  const getMaxWidth = () => {
+    if (page === PAGES.CALENDAR) return w < 480 ? "100%" : 900;
+    return w < 480 ? "100%" : 540;
+  };
+
   if (authLoading) return (<div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", fontFamily: "'Nunito', sans-serif", fontSize: 14, color: "#999" }}><link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet" />Loading...</div>);
   if (!user) return (<><link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet" /><AuthPage onAuth={setUser} /></>);
   if (!loaded) return (<div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", fontFamily: "'Nunito', sans-serif", fontSize: 14, color: "#999" }}><link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet" />Loading your data...</div>);
 
   return (
-    <div style={{ maxWidth: page === PAGES.CALENDAR ? 900 : 540, margin: "0 auto", padding: "60px 20px 60px", minHeight: "100vh", background: "#fff", color: "#000", transition: "max-width 0.3s ease" }}>
+    <div style={{ maxWidth: getMaxWidth(), margin: "0 auto", padding: w < 480 ? "56px 12px 60px" : "60px 20px 60px", minHeight: "100vh", background: "#fff", color: "#000", transition: "max-width 0.3s ease" }}>
       <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
       <TopNavBar sessions={sessions} streak={streak} todayMins={todayMins} onMenuClick={() => setSidebarOpen(true)} />
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} page={page} setPage={setPage} sessions={sessions} onLogout={handleLogout} />
