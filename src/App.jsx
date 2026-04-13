@@ -65,11 +65,12 @@ async function upsertSleepLog(date,sleepStart,wakeUp,totalMins){const{data:{user
 
 // ─── Utilities (IST-aware) ───
 function toIST(d){return new Date(d.toLocaleString("en-US",{timeZone:"Asia/Kolkata"}));}
-function todayStr(){const n=toIST(new Date());return`${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,"0")}-${String(n.getDate()).padStart(2,"0")}`;}
+function dateToStr(d){return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;}
+function todayStr(){return dateToStr(toIST(new Date()));}
 function nowIST(){return toIST(new Date());}
 function formatTime(s){const m=Math.floor(s/60);const sec=s%60;return`${String(m).padStart(2,"0")}:${String(sec).padStart(2,"0")}`;}
 function formatHM(mins){const h=Math.floor(mins/60);const m=mins%60;if(h===0)return`${m}m`;if(m===0)return`${h}h`;return`${h}h ${m}m`;}
-function calcStreak(sessions){const dt={};sessions.forEach(s=>{dt[s.date]=(dt[s.date]||0)+s.duration;});let streak=0;const d=new Date();const tk=todayStr();if((dt[tk]||0)>=120){streak=1;d.setDate(d.getDate()-1);}else{d.setDate(d.getDate()-1);}while(true){const k=d.toISOString().slice(0,10);if((dt[k]||0)>=120){streak++;d.setDate(d.getDate()-1);}else break;}return streak;}
+function calcStreak(sessions){const dt={};sessions.forEach(s=>{dt[s.date]=(dt[s.date]||0)+s.duration;});let streak=0;const d=nowIST();const tk=todayStr();if((dt[tk]||0)>=120){streak=1;d.setDate(d.getDate()-1);}else{d.setDate(d.getDate()-1);}while(true){const k=dateToStr(d);if((dt[k]||0)>=120){streak++;d.setDate(d.getDate()-1);}else break;}return streak;}
 function getDayTotals(sessions){const t={};sessions.forEach(s=>{t[s.date]=(t[s.date]||0)+s.duration;});return t;}
 function isPastDate(ds){return ds<todayStr();}
 function getGreenForMins(mins){if(mins<120)return"#E63946";const hrs=mins/60;const t=Math.min((hrs-2)/4,1);return`rgb(${Math.round(42-t*30)},${Math.round(157+t*40)},${Math.round(143-t*80)})`;}
@@ -125,7 +126,7 @@ function WeekStrip({sessions}){
   const T=useT();const w=useWindowWidth();const mob=w<480;
   const dt=getDayTotals(sessions);const now=nowIST();const tk=todayStr();
   const dow=now.getDay();const mon=new Date(now);mon.setDate(now.getDate()-((dow+6)%7));
-  const wd=[];for(let i=0;i<7;i++){const dd=new Date(mon);dd.setDate(mon.getDate()+i);wd.push(dd.toISOString().slice(0,10));}
+  const wd=[];for(let i=0;i<7;i++){const dd=new Date(mon);dd.setDate(mon.getDate()+i);wd.push(dateToStr(dd));}
   const dl=["M","T","W","TH","F","SA","SU"];
   const wt=wd.reduce((a,d)=>a+(dt[d]||0),0);
   const tm=sessions.filter(s=>s.date===tk).reduce((a,s)=>a+s.duration,0);
@@ -342,7 +343,7 @@ function TimerPage({sessions,setSessions}){
 // ─── Tasks Page ───
 function TasksPage({tasks,setTasks}){
   const T=useT();const[selectedDate,setSelectedDate]=useState(todayStr());const[newTask,setNewTask]=useState("");const w=useWindowWidth();const mob=w<480;
-  const isToday=selectedDate===todayStr();const shiftDate=(dir)=>{const d=new Date(selectedDate+"T12:00:00");d.setDate(d.getDate()+dir);setSelectedDate(d.toISOString().slice(0,10));};
+  const isToday=selectedDate===todayStr();const shiftDate=(dir)=>{const d=new Date(selectedDate+"T12:00:00");d.setDate(d.getDate()+dir);setSelectedDate(dateToStr(d));};
   const dateLabel=isToday?"Today":new Date(selectedDate+"T12:00:00").toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"});
   const dayTasks=tasks.filter(t=>t.date===selectedDate&&!t.time_slot);const dayPlannerTasks=tasks.filter(t=>t.date===selectedDate&&t.time_slot);
   const addTask=async()=>{if(!newTask.trim())return;const sv=await insertTask(newTask.trim(),selectedDate,null);if(sv)setTasks(p=>[...p,sv]);setNewTask("");};
@@ -394,7 +395,7 @@ function PlannerSlotInput({slotKey,onAdd}){const T=useT();const[v,setV]=useState
 // ─── Chart components ───
 const TAG_COLORS=["#E63946","#457B9D","#2A9D8F","#E9C46A","#F4A261","#6A4C93","#1982C4","#8AC926","#FF595E","#6D6875","#264653","#F77F00","#D62828","#023E8A","#606C38"];
 function getTagColor(tag,allTags){return TAG_COLORS[allTags.indexOf(tag)%TAG_COLORS.length];}
-function getWeekRange(ds){const d=new Date(ds+"T12:00:00");const m=new Date(d);m.setDate(d.getDate()-((d.getDay()+6)%7));const days=[];for(let i=0;i<7;i++){const dd=new Date(m);dd.setDate(m.getDate()+i);days.push(dd.toISOString().slice(0,10));}return days;}
+function getWeekRange(ds){const d=new Date(ds+"T12:00:00");const m=new Date(d);m.setDate(d.getDate()-((d.getDay()+6)%7));const days=[];for(let i=0;i<7;i++){const dd=new Date(m);dd.setDate(m.getDate()+i);days.push(dateToStr(dd));}return days;}
 function getMonthDates(y,m){const n=new Date(y,m+1,0).getDate();const dates=[];for(let d=1;d<=n;d++)dates.push(`${y}-${String(m+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`);return dates;}
 function SectionHeader({children}){const T=useT();return(<div style={{fontSize:11,fontFamily:F,textTransform:"uppercase",letterSpacing:"0.15em",color:T.tx3,marginBottom:14,fontWeight:600,marginTop:40}}>{children}</div>);}
 function TagBarChart({sorted,allTags}){if(sorted.length===0)return null;const mx=sorted[0][1];const bH=160;return(<div style={{overflowX:"auto",paddingBottom:8}}><div style={{display:"flex",alignItems:"flex-end",gap:6,minWidth:sorted.length*50,height:bH+40,paddingTop:20}}>{sorted.map(([tag,mins])=>{const h=mx>0?(mins/mx)*bH:0;const c=getTagColor(tag,allTags);return(<div key={tag} style={{flex:1,minWidth:36,maxWidth:60,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"flex-end",height:bH+40}}><span style={{fontSize:10,fontFamily:F,fontWeight:700,marginBottom:4,color:c}}>{formatHM(mins)}</span><div style={{width:"60%",height:h,background:c,borderRadius:"4px 4px 0 0",transition:"height 0.4s ease",minHeight:mins>0?6:0}}/><span style={{fontSize:9,fontFamily:F,marginTop:6,textAlign:"center",color:"#888",maxWidth:60,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",width:"100%"}}>{tag}</span></div>);})}</div></div>);}
@@ -412,7 +413,7 @@ function AnalysisPage({sessions,setSessions}){
   const logQuick=()=>{const mins=parseInt(qlMins);if(!qlTag.trim()||isNaN(mins)||mins<=0)return;addSession({id:Date.now(),tag:qlTag.trim(),duration:mins,date:selectedDate,ts:Date.now()});setQlTag("");setQlMins("");};
 
   const ds=sessions.filter(s=>s.date===selectedDate);const tt={};ds.forEach(s=>{tt[s.tag]=(tt[s.tag]||0)+s.duration;});const tot=ds.reduce((a,s)=>a+s.duration,0);const sorted=Object.entries(tt).sort((a,b)=>b[1]-a[1]);const allTags=[...new Set(sessions.map(s=>s.tag))];
-  const shiftDate=(dir)=>{const d=new Date(selectedDate+"T12:00:00");d.setDate(d.getDate()+dir);setSelectedDate(d.toISOString().slice(0,10));};
+  const shiftDate=(dir)=>{const d=new Date(selectedDate+"T12:00:00");d.setDate(d.getDate()+dir);setSelectedDate(dateToStr(d));};
   const isToday=selectedDate===todayStr();const dateLabel=isToday?"Today":new Date(selectedDate+"T12:00:00").toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"});
   const wDates=getWeekRange(selectedDate);const wLabel=`${new Date(wDates[0]+"T12:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric"})} – ${new Date(wDates[6]+"T12:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric"})}`;
   const mDates=getMonthDates(vm.year,vm.month);const mLabel=new Date(vm.year,vm.month).toLocaleDateString("en-US",{month:"long",year:"numeric"});
@@ -557,7 +558,7 @@ function SleepPage({sleepLogs,setSleepLogs}){
   const logSleep=async()=>{const totalMins=calcSleepMins(sleepStart,wakeUp);const sv=await upsertSleepLog(logDate,sleepStart,wakeUp,totalMins);if(sv){setSleepLogs(p=>{const f=p.filter(l=>l.date!==logDate);return[sv,...f].sort((a,b)=>b.date.localeCompare(a.date));});}};
   const sleepColor=(mins)=>{if(mins<360)return"#F4A261";if(mins<=450)return"#2A9D8F";return"#E63946";};
   const now=nowIST();const dow=now.getDay();const mon=new Date(now);mon.setDate(now.getDate()-((dow+6)%7));
-  const weekDays=[];for(let i=0;i<7;i++){const dd=new Date(mon);dd.setDate(mon.getDate()+i);weekDays.push(dd.toISOString().slice(0,10));}
+  const weekDays=[];for(let i=0;i<7;i++){const dd=new Date(mon);dd.setDate(mon.getDate()+i);weekDays.push(dateToStr(dd));}
   const dayLabels=["M","T","W","TH","F","SA","SU"];
   const logMap={};sleepLogs.forEach(l=>{logMap[l.date]=l;});
   const barData=weekDays.map(d=>({date:d,mins:logMap[d]?.total_mins||0}));const maxSleep=Math.max(...barData.map(d=>d.mins),1);const bH=120;
