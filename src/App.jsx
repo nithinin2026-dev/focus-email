@@ -577,36 +577,46 @@ function GoalsPage({sessions}){
         </div>
 
         {/* This Week Bar */}
+        {(()=>{
+          const weeklyNeedMins=Math.round(S.avgNow*60*7);
+          const wRemainMins=Math.max(0,weeklyNeedMins-S.wTotal);
+          const todayIdx=S.wDays.findIndex(d=>d===todayStr());
+          const remainDays=Math.max(1,todayIdx>=0?7-todayIdx:7);
+          const dynamicDaily=Math.round(wRemainMins/remainDays);
+          const scaleMax=Math.max(dynamicDaily*1.5,Math.max(...S.wData.map(x=>x.mins)),1);
+          return(<>
         <div style={{fontSize:11,textTransform:"uppercase",letterSpacing:"0.15em",color:T.tx3,fontWeight:600,marginBottom:14}}>This Week — {goal.tag}</div>
         <div style={{position:"relative"}}>
           <div style={{display:"flex",alignItems:"flex-end",gap:mob?6:10,height:140,paddingTop:16,marginBottom:8}}>
             {S.wData.map((d,i)=>{
-              const dailyTarget=S.avgNow*60;const dailyOrig=S.avgOrig*60;const scaleMax=Math.max(dailyTarget*1.5,Math.max(...S.wData.map(x=>x.mins)),1);const isFut=d.date>todayStr();const h=d.mins>0?Math.max((d.mins/scaleMax)*100,8):isFut?0:4;
+              const isFut=d.date>todayStr();const isT=d.date===todayStr();const isPast=d.date<todayStr();
+              const h=d.mins>0?Math.max((d.mins/scaleMax)*100,8):isFut?0:4;
               let bColor;
               if(isFut)bColor=T.bd;
-              else if(d.mins>=dailyTarget)bColor="#2A9D8F";
-              else if(d.mins>=dailyTarget*0.8)bColor="#F4A261";
+              else if(d.mins>=dynamicDaily)bColor="#2A9D8F";
+              else if(d.mins>=dynamicDaily*0.8)bColor="#F4A261";
               else bColor=d.mins>0?"#E63946":T.bd2;
               return(<div key={d.date} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"flex-end",height:140,maxWidth:60}}>
                 {d.mins>0&&!isFut&&<span style={{fontSize:9,fontWeight:700,color:bColor,marginBottom:2}}>{formatHM(d.mins)}</span>}
                 <div style={{width:"65%",height:h,background:bColor,borderRadius:"3px 3px 0 0",minHeight:d.mins>0?6:isFut?0:2,transition:"height 0.3s ease"}}/>
-                <span style={{fontSize:10,fontWeight:600,color:d.date===todayStr()?T.tx:T.tx3,marginTop:4}}>{S.dLabels[i]}</span>
+                <span style={{fontSize:10,fontWeight:600,color:isT?T.tx:T.tx3,marginTop:4}}>{S.dLabels[i]}</span>
               </div>);})}
           </div>
-          {/* Daily target dashed line */}
-          {(()=>{const dailyTarget=S.avgNow*60;const scaleMax=Math.max(dailyTarget*1.5,Math.max(...S.wData.map(x=>x.mins)),1);const linePos=Math.min((dailyTarget/scaleMax)*100,100);return linePos>0&&linePos<=100?(<div style={{position:"absolute",left:0,right:0,bottom:`${8+28+linePos*0.92}px`,borderTop:"2px dashed #E63946",opacity:0.5,pointerEvents:"none"}}><span style={{position:"absolute",right:0,top:-14,fontSize:8,color:"#E63946",fontWeight:700,fontFamily:F}}>{formatHM(Math.round(dailyTarget))}/day needed</span></div>):null;})()}
+          {/* Dynamic daily target dashed line */}
+          {dynamicDaily>0&&(()=>{const linePos=Math.min((dynamicDaily/scaleMax)*100,100);return linePos>0&&linePos<=100?(<div style={{position:"absolute",left:0,right:0,bottom:`${8+28+linePos*0.92}px`,borderTop:"2px dashed #E63946",opacity:0.5,pointerEvents:"none"}}><span style={{position:"absolute",right:0,top:-14,fontSize:8,color:"#E63946",fontWeight:700,fontFamily:F}}>{formatHM(dynamicDaily)}/day to hit weekly</span></div>):null;})()}
         </div>
         <div style={{display:"flex",gap:12,fontSize:10,color:T.tx3,marginBottom:8,flexWrap:"wrap"}}>
           <span style={{display:"flex",alignItems:"center",gap:4}}><span style={{width:8,height:8,background:"#2A9D8F",borderRadius:2,display:"inline-block"}}/> On target</span>
           <span style={{display:"flex",alignItems:"center",gap:4}}><span style={{width:8,height:8,background:"#F4A261",borderRadius:2,display:"inline-block"}}/> Within 20%</span>
           <span style={{display:"flex",alignItems:"center",gap:4}}><span style={{width:8,height:8,background:"#E63946",borderRadius:2,display:"inline-block"}}/> Behind</span>
-          <span style={{display:"flex",alignItems:"center",gap:4}}><span style={{width:12,height:0,borderTop:"2px dashed #E63946",display:"inline-block"}}/> {formatHM(Math.round(S.avgNow*60))}/day needed</span>
+          <span style={{display:"flex",alignItems:"center",gap:4}}><span style={{width:12,height:0,borderTop:"2px dashed #E63946",display:"inline-block"}}/> {formatHM(dynamicDaily)}/day ({remainDays}d left)</span>
         </div>
         <div style={{background:T.bg3,borderRadius:8,padding:"12px 16px",marginBottom:24}}>
           <span style={{fontSize:12,fontWeight:600,color:T.tx}}>Week total: {formatHM(S.wTotal)}</span>
-          <span style={{fontSize:12,color:T.tx3,marginLeft:8}}>· Need {formatHM(Math.round(S.avgNow*60*7))}/week</span>
-          {S.wTotal>=Math.round(S.avgNow*60*7)?<span style={{marginLeft:8}}>🔥</span>:<span style={{marginLeft:8,color:"#E63946",fontSize:11,fontWeight:600}}> — {formatHM(Math.max(0,Math.round(S.avgNow*60*7)-S.wTotal))} short</span>}
+          <span style={{fontSize:12,color:T.tx3,marginLeft:8}}>· Need {formatHM(weeklyNeedMins)}/week</span>
+          {S.wTotal>=weeklyNeedMins?<span style={{marginLeft:8}}>🔥</span>:<span style={{marginLeft:8,color:"#E63946",fontSize:11,fontWeight:600}}> — {formatHM(wRemainMins)} left in {remainDays}d</span>}
         </div>
+          </>);})()}
 
         {/* Timeline */}
         <div style={{fontSize:11,textTransform:"uppercase",letterSpacing:"0.15em",color:T.tx3,fontWeight:600,marginBottom:14}}>Timeline</div>
