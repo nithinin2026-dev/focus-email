@@ -63,8 +63,10 @@ async function deleteTask(taskId){await supabase.from("tasks").delete().eq("id",
 async function loadSleepLogs(){const{data,error}=await supabase.from("sleep_logs").select("*").order("date",{ascending:false});if(error)return[];return data;}
 async function upsertSleepLog(date,sleepStart,wakeUp,totalMins){const{data:{user}}=await supabase.auth.getUser();if(!user)return null;const{data,error}=await supabase.from("sleep_logs").upsert({user_id:user.id,date,sleep_start:sleepStart,wake_up:wakeUp,total_mins:totalMins},{onConflict:"user_id,date"}).select().single();if(error)return null;return data;}
 
-// ─── Utilities ───
-function todayStr(){return new Date().toISOString().slice(0,10);}
+// ─── Utilities (IST-aware) ───
+function toIST(d){return new Date(d.toLocaleString("en-US",{timeZone:"Asia/Kolkata"}));}
+function todayStr(){const n=toIST(new Date());return`${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,"0")}-${String(n.getDate()).padStart(2,"0")}`;}
+function nowIST(){return toIST(new Date());}
 function formatTime(s){const m=Math.floor(s/60);const sec=s%60;return`${String(m).padStart(2,"0")}:${String(sec).padStart(2,"0")}`;}
 function formatHM(mins){const h=Math.floor(mins/60);const m=mins%60;if(h===0)return`${m}m`;if(m===0)return`${h}h`;return`${h}h ${m}m`;}
 function calcStreak(sessions){const dt={};sessions.forEach(s=>{dt[s.date]=(dt[s.date]||0)+s.duration;});let streak=0;const d=new Date();const tk=todayStr();if((dt[tk]||0)>=120){streak=1;d.setDate(d.getDate()-1);}else{d.setDate(d.getDate()-1);}while(true){const k=d.toISOString().slice(0,10);if((dt[k]||0)>=120){streak++;d.setDate(d.getDate()-1);}else break;}return streak;}
@@ -121,7 +123,7 @@ function TopNavBar({sessions,streak,todayMins,onMenuClick}){
 // ═══════════════════════════════════════════
 function WeekStrip({sessions}){
   const T=useT();const w=useWindowWidth();const mob=w<480;
-  const dt=getDayTotals(sessions);const now=new Date();const tk=todayStr();
+  const dt=getDayTotals(sessions);const now=nowIST();const tk=todayStr();
   const dow=now.getDay();const mon=new Date(now);mon.setDate(now.getDate()-((dow+6)%7));
   const wd=[];for(let i=0;i<7;i++){const dd=new Date(mon);dd.setDate(mon.getDate()+i);wd.push(dd.toISOString().slice(0,10));}
   const dl=["M","T","W","TH","F","SA","SU"];
@@ -174,7 +176,7 @@ function WeekStrip({sessions}){
 function Sidebar({open,onClose,page,setPage,sessions,onLogout,isDark,onToggleTheme}){
   const T=useT();
   const items=[{key:PAGES.TIMER,label:"Timer",icon:"⏱"},{key:PAGES.TASKS,label:"Tasks",icon:"✅"},{key:PAGES.ANALYSIS,label:"Analysis",icon:"📊"},{key:PAGES.CALENDAR,label:"Calendar",icon:"📅"},{key:PAGES.REFLECTION,label:"Reflect",icon:"💭"},{key:PAGES.SLEEP,label:"Sleep",icon:"🌙"}];
-  const now=new Date();const ys=String(now.getFullYear());const mn=now.toLocaleDateString("en-US",{month:"short"});
+  const now=nowIST();const ys=String(now.getFullYear());const mn=now.toLocaleDateString("en-US",{month:"short"});
   const yMins=sessions.filter(s=>s.date.startsWith(ys)).reduce((a,s)=>a+s.duration,0);
   const mp=`${ys}-${String(now.getMonth()+1).padStart(2,"0")}`;
   const mMins=sessions.filter(s=>s.date.startsWith(mp)).reduce((a,s)=>a+s.duration,0);
@@ -371,7 +373,7 @@ function TasksPage({tasks,setTasks}){
       <div style={{marginTop:36}}>
         <div style={{fontSize:11,fontFamily:F,textTransform:"uppercase",letterSpacing:"0.15em",color:T.tx3,marginBottom:12,fontWeight:600}}>Day Planner</div>
         <div style={{border:`2px solid ${T.bd}`,borderRadius:6,overflow:"hidden"}}>
-          {slots.map(slot=>{const st=dayPlannerTasks.find(t=>t.time_slot===slot.key);const done=st&&!!st.completed_date;const[slotStart]=slot.key.split("-").map(Number);const curHr=new Date().getHours();const isCurSlot=isToday&&curHr>=slotStart&&curHr<slotStart+1;return(
+          {slots.map(slot=>{const st=dayPlannerTasks.find(t=>t.time_slot===slot.key);const done=st&&!!st.completed_date;const[slotStart]=slot.key.split("-").map(Number);const curHr=nowIST().getHours();const isCurSlot=(selectedDate===todayStr())&&curHr>=slotStart&&curHr<slotStart+1;return(
             <div key={slot.key} style={{display:"flex",borderBottom:`1px solid ${T.bd}`,fontFamily:F,minHeight:42,background:isCurSlot?"rgba(42,157,143,0.08)":"transparent"}}>
               <div style={{width:mob?90:120,padding:mob?"10px 8px":"10px 12px",background:T.bg3,fontWeight:600,color:T.tx2,flexShrink:0,display:"flex",alignItems:"center",fontSize:mob?11:13}}>{slot.label}</div>
               <div style={{flex:1,padding:"8px 12px",display:"flex",alignItems:"center",gap:10,minWidth:0}}>
@@ -403,7 +405,12 @@ async function exportToExcel(sessions){const XLSX=await import("xlsx");const dm=
 
 // ─── Analysis Page ───
 function AnalysisPage({sessions,setSessions}){
-  const T=useT();const[selectedDate,setSelectedDate]=useState(todayStr());const[showR,setShowR]=useState(false);const[showA,setShowA]=useState(false);const rRef=useRef(null);const aRef=useRef(null);const[vm,setVm]=useState(()=>{const d=new Date();return{year:d.getFullYear(),month:d.getMonth()};});const w=useWindowWidth();const mob=w<480;
+  const T=useT();const[selectedDate,setSelectedDate]=useState(todayStr());const[showR,setShowR]=useState(false);const[showA,setShowA]=useState(false);const rRef=useRef(null);const aRef=useRef(null);const[vm,setVm]=useState(()=>{const d=nowIST();return{year:d.getFullYear(),month:d.getMonth()};});const w=useWindowWidth();const mob=w<480;
+  // Quick Log state for selected date
+  const[qlTag,setQlTag]=useState("");const[qlMins,setQlMins]=useState("");
+  const addSession=useCallback(async(ns)=>{setSessions(p=>[...p,ns]);const sv=await insertSession(ns);if(sv){setSessions(p=>p.map(s=>s.ts===ns.ts&&s.tag===ns.tag?{id:sv.id,tag:sv.tag,duration:sv.duration,date:sv.date,ts:Number(sv.ts)}:s));}},[setSessions]);
+  const logQuick=()=>{const mins=parseInt(qlMins);if(!qlTag.trim()||isNaN(mins)||mins<=0)return;addSession({id:Date.now(),tag:qlTag.trim(),duration:mins,date:selectedDate,ts:Date.now()});setQlTag("");setQlMins("");};
+
   const ds=sessions.filter(s=>s.date===selectedDate);const tt={};ds.forEach(s=>{tt[s.tag]=(tt[s.tag]||0)+s.duration;});const tot=ds.reduce((a,s)=>a+s.duration,0);const sorted=Object.entries(tt).sort((a,b)=>b[1]-a[1]);const allTags=[...new Set(sessions.map(s=>s.tag))];
   const shiftDate=(dir)=>{const d=new Date(selectedDate+"T12:00:00");d.setDate(d.getDate()+dir);setSelectedDate(d.toISOString().slice(0,10));};
   const isToday=selectedDate===todayStr();const dateLabel=isToday?"Today":new Date(selectedDate+"T12:00:00").toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"});
@@ -419,6 +426,7 @@ function AnalysisPage({sessions,setSessions}){
   const zones=[{label:"< 1 hr",min:0,max:60},{label:"1–2 hrs",min:60,max:120},{label:"2–3 hrs",min:120,max:180},{label:"3–4 hrs",min:180,max:240},{label:"4+ hrs",min:240,max:99999}];const bestZone=zones.map(z=>({...z,count:Object.values(dtAll).filter(m=>m>=z.min&&m<z.max).length})).sort((a,b)=>b.count-a.count)[0];
   const nb={border:"none",background:"none",fontSize:20,cursor:"pointer",color:T.tx};const tH={fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.1em",fontFamily:F,color:T.tx3};const tR={display:"grid",padding:"9px 0",borderBottom:`1px solid ${T.bd}`,fontFamily:F,fontSize:mob?12:13,alignItems:"center"};const gc=mob?"1fr 80px 60px":"1fr 100px 80px";
   const togBtn=(active)=>({border:`2px solid ${T.bd3}`,background:active?T.btn:"transparent",color:active?T.btnT:T.tx,padding:"10px 24px",fontSize:12,fontFamily:F,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase",cursor:"pointer",display:"inline-flex",alignItems:"center",gap:8});
+  const iStyle={border:`2px solid ${T.bd3}`,padding:"10px 14px",fontSize:14,fontFamily:F,background:"transparent",outline:"none",boxSizing:"border-box",color:T.tx};
   return(
     <div>
       <SectionHeader>Daily Report</SectionHeader>
@@ -428,6 +436,15 @@ function AnalysisPage({sessions,setSessions}){
       <div style={{textAlign:"center",marginBottom:24}}><div style={{fontSize:42,fontFamily:F,fontWeight:700,color:T.tx}}>{formatHM(tot)}</div><div style={{fontSize:11,fontFamily:F,textTransform:"uppercase",letterSpacing:"0.15em",color:T.tx3,marginTop:4,fontWeight:600}}>Total Upskilling {tot>=120&&"🔥"}</div></div>
       {sorted.length===0?(<div style={{textAlign:"center",color:T.tx4,fontFamily:F,fontSize:13,padding:"30px 0"}}>No sessions recorded</div>):(<TagBarChart sorted={sorted} allTags={allTags}/>)}
       {ds.length>0&&(<div style={{marginTop:24}}><div style={{fontSize:10,fontFamily:F,textTransform:"uppercase",letterSpacing:"0.12em",color:T.tx4,marginBottom:8,fontWeight:600}}>Session Log</div>{ds.map(s=>(<div key={s.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"7px 0",borderBottom:`1px solid ${T.bd}`,fontFamily:F,fontSize:13}}><span style={{display:"flex",alignItems:"center",gap:8,minWidth:0}}><span style={{width:8,height:8,borderRadius:2,background:getTagColor(s.tag,allTags),display:"inline-block",flexShrink:0}}/><span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",color:T.tx}}>{s.tag}</span></span><span style={{display:"flex",alignItems:"center",gap:10,flexShrink:0}}><span style={{color:T.tx3}}>{formatHM(s.duration)}</span><button onClick={async()=>{await deleteSession(s.id);setSessions(p=>p.filter(x=>x.id!==s.id));}} style={{border:"none",background:"none",cursor:"pointer",color:T.tx4,fontSize:16,padding:"0 2px",lineHeight:1}} title="Delete">✕</button></span></div>))}</div>)}
+      {/* ── Quick Log for selected date ── */}
+      <div style={{marginTop:28,marginBottom:8}}>
+        <div style={{fontSize:11,fontFamily:F,textTransform:"uppercase",letterSpacing:"0.15em",color:T.tx3,marginBottom:12,fontWeight:600}}>Quick Log — {dateLabel}</div>
+        <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+          <input value={qlTag} onChange={e=>setQlTag(e.target.value)} placeholder="Tag" onKeyDown={e=>e.key==="Enter"&&logQuick()} style={{...iStyle,flex:1,minWidth:100}}/>
+          <input value={qlMins} onChange={e=>setQlMins(e.target.value)} placeholder="mins" type="number" onKeyDown={e=>e.key==="Enter"&&logQuick()} style={{...iStyle,width:80}}/>
+          <button onClick={logQuick} style={{padding:"10px 20px",border:`2px solid ${T.bd3}`,background:T.btn,color:T.btnT,fontSize:13,fontFamily:F,fontWeight:700,cursor:"pointer"}}>+</button>
+        </div>
+      </div>
       <div style={{marginTop:32,textAlign:"center"}}><button onClick={()=>setShowR(!showR)} style={togBtn(showR)}><span style={{display:"inline-block",transition:"transform 0.3s ease",transform:showR?"rotate(180deg)":"rotate(0deg)",fontSize:10}}>▼</span>{showR?"Hide Reports":"Weekly & Monthly Reports"}</button></div>
       <div style={{maxHeight:showR?(rRef.current?rRef.current.scrollHeight+"px":"2000px"):"0px",overflow:"hidden",transition:"max-height 0.5s ease, opacity 0.4s ease",opacity:showR?1:0}}><div ref={rRef}>
         <SectionHeader>Weekly Report — {wLabel}</SectionHeader><PeriodBarChart dates={wDates} sessions={sessions}/>
@@ -449,7 +466,7 @@ function AnalysisPage({sessions,setSessions}){
 
 // ─── Calendar Page ───
 function CalendarPage({sessions}){
-  const T=useT();const currentYear=new Date().getFullYear();const[selYear,setSelYear]=useState(currentYear);const[selTag,setSelTag]=useState("__all__");const w=useWindowWidth();const allTags=[...new Set(sessions.map(s=>s.tag))].sort();const tk=todayStr();
+  const T=useT();const currentYear=nowIST().getFullYear();const[selYear,setSelYear]=useState(currentYear);const[selTag,setSelTag]=useState("__all__");const w=useWindowWidth();const allTags=[...new Set(sessions.map(s=>s.tag))].sort();const tk=todayStr();
   const fireDays=new Set();const dayMinsMap={};
   if(selTag==="__all__"){sessions.forEach(s=>{if(s.date.startsWith(String(selYear))){dayMinsMap[s.date]=(dayMinsMap[s.date]||0)+s.duration;}});Object.entries(dayMinsMap).forEach(([d,m])=>{if(m>=120)fireDays.add(d);});}else{sessions.forEach(s=>{if(s.date.startsWith(String(selYear))&&s.tag===selTag){fireDays.add(s.date);dayMinsMap[s.date]=(dayMinsMap[s.date]||0)+s.duration;}});}
   const isAll=selTag==="__all__";const dH=["M","T","W","T","F","S","S"];const yOpts=[];for(let y=2025;y<=2027;y++)yOpts.push(y);const totalFire=fireDays.size;const colCount=w<480?1:w<768?2:3;
@@ -458,7 +475,7 @@ function CalendarPage({sessions}){
     const dim=new Date(year,month+1,0).getDate();const fdRaw=new Date(year,month,1).getDay();const fdMon=(fdRaw+6)%7;const cells=[];for(let i=0;i<fdMon;i++)cells.push(null);for(let d=1;d<=dim;d++)cells.push(d);while(cells.length%7!==0)cells.push(null);
     let mTotal=0;for(let d=1;d<=dim;d++){const k=`${year}-${String(month+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;mTotal+=(dayMinsMap[k]||0);}const avg=Math.round(mTotal/dim);
     let mFire=0;for(let d=1;d<=dim;d++){const k=`${year}-${String(month+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;if(fireDays.has(k))mFire++;}
-    const now=new Date();const isCur=year===now.getFullYear()&&month===now.getMonth();const cfs=colCount===1?14:colCount===2?12:11;const hfs=colCount===1?10:9;
+    const now=nowIST();const isCur=year===now.getFullYear()&&month===now.getMonth();const cfs=colCount===1?14:colCount===2?12:11;const hfs=colCount===1?10:9;
     return(<div style={{fontFamily:F}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:8,padding:"0 2px"}}><span style={{fontSize:colCount===1?16:13,fontWeight:800,color:T.tx}}>{mNames[month]}</span><span style={{fontSize:colCount===1?13:11,fontWeight:700,color:avg>0?"#2A9D8F":T.tx4}}>Avg {formatHM(avg)}</span></div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(7, 1fr)",gap:0}}>{dH.map((d,i)=>(<div key={i} style={{height:colCount===1?28:22,display:"flex",alignItems:"center",justifyContent:"center",fontSize:hfs,fontWeight:700,color:T.tx2,border:`1px solid ${T.calBd}`,borderBottom:`2px solid ${T.calBd}`,background:T.calH}}>{d}</div>))}</div>
@@ -539,20 +556,16 @@ function SleepPage({sleepLogs,setSleepLogs}){
   const calcSleepMins=(start,wake)=>{const[sh,sm]=start.split(":").map(Number);const[wh,wm]=wake.split(":").map(Number);let sM=sh*60+sm;let wM=wh*60+wm;if(wM<=sM)wM+=1440;return wM-sM;};
   const logSleep=async()=>{const totalMins=calcSleepMins(sleepStart,wakeUp);const sv=await upsertSleepLog(logDate,sleepStart,wakeUp,totalMins);if(sv){setSleepLogs(p=>{const f=p.filter(l=>l.date!==logDate);return[sv,...f].sort((a,b)=>b.date.localeCompare(a.date));});}};
   const sleepColor=(mins)=>{if(mins<360)return"#F4A261";if(mins<=450)return"#2A9D8F";return"#E63946";};
-  // Weekly M-Su dates
-  const now=new Date();const dow=now.getDay();const mon=new Date(now);mon.setDate(now.getDate()-((dow+6)%7));
+  const now=nowIST();const dow=now.getDay();const mon=new Date(now);mon.setDate(now.getDate()-((dow+6)%7));
   const weekDays=[];for(let i=0;i<7;i++){const dd=new Date(mon);dd.setDate(mon.getDate()+i);weekDays.push(dd.toISOString().slice(0,10));}
   const dayLabels=["M","T","W","TH","F","SA","SU"];
   const logMap={};sleepLogs.forEach(l=>{logMap[l.date]=l;});
   const barData=weekDays.map(d=>({date:d,mins:logMap[d]?.total_mins||0}));const maxSleep=Math.max(...barData.map(d=>d.mins),1);const bH=120;
-  // Avg time helper: convert HH:MM to minutes, average, convert back
   const avgTime=(times)=>{if(times.length===0)return"—";const mins=times.map(t=>{const[h,m]=t.split(":").map(Number);return h*60+m;});const isSleep=mins.some(m=>m>=720);const adjusted=isSleep?mins.map(m=>m<720?m+1440:m):mins;const avg=Math.round(adjusted.reduce((a,m)=>a+m,0)/adjusted.length)%1440;const hh=Math.floor(avg/60);const mm=avg%60;const ampm=hh>=12?"PM":"AM";const h12=hh===0?12:hh>12?hh-12:hh;return`${h12}:${String(mm).padStart(2,"0")} ${ampm}`;};
-  // Weekly averages (this week M-Su)
   const weekLogs=weekDays.map(d=>logMap[d]).filter(Boolean);
   const wAvgSleep=weekLogs.length>0?Math.round(weekLogs.reduce((a,l)=>a+(l.total_mins||0),0)/weekLogs.length):0;
   const wAvgBed=avgTime(weekLogs.map(l=>l.sleep_start).filter(Boolean));
   const wAvgWake=avgTime(weekLogs.map(l=>l.wake_up).filter(Boolean));
-  // Monthly averages
   const thisM=todayStr().slice(0,7);const mLogs=sleepLogs.filter(l=>l.date.startsWith(thisM));
   const mAvg=mLogs.length>0?Math.round(mLogs.reduce((a,l)=>a+(l.total_mins||0),0)/mLogs.length):0;
   const mAvgBed=avgTime(mLogs.map(l=>l.sleep_start).filter(Boolean));
@@ -601,7 +614,6 @@ export default function App(){
   const toggleTheme=()=>{setIsDark(p=>{const n=!p;localStorage.setItem("fm_theme",n?"dark":"light");return n;});};
   const theme=isDark?D:L;const w=useWindowWidth();
   useEffect(()=>{document.body.style.background=theme.bg;document.documentElement.style.background=theme.bg;document.body.style.margin="0";},[isDark]);
-  // Set bg immediately on first render (prevents white flash)
   if(typeof document!=="undefined"){document.body.style.background=(localStorage.getItem("fm_theme")==="dark"?"#000":"#fff");document.documentElement.style.background=(localStorage.getItem("fm_theme")==="dark"?"#000":"#fff");}
   useEffect(()=>{supabase.auth.getSession().then(({data:{session}})=>{setUser(session?.user??null);setAuthLoading(false);});const{data:{subscription}}=supabase.auth.onAuthStateChange((_e,session)=>{setUser(session?.user??null);});return()=>subscription.unsubscribe();},[]);
   useEffect(()=>{if(!user){setSessions([]);setTasks([]);setSleepLogs([]);setLoaded(false);return;}setLoaded(false);Promise.all([loadSessions(),loadTasks(),loadSleepLogs()]).then(([s,t,sl])=>{setSessions(s);setTasks(t);setSleepLogs(sl);setLoaded(true);});},[user]);
