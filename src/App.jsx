@@ -62,6 +62,9 @@ async function updateTaskCompleted(taskId,completedDate){await supabase.from("ta
 async function deleteTask(taskId){await supabase.from("tasks").delete().eq("id",taskId);}
 async function loadSleepLogs(){const{data,error}=await supabase.from("sleep_logs").select("*").order("date",{ascending:false});if(error)return[];return data;}
 async function upsertSleepLog(date,sleepStart,wakeUp,totalMins){const{data:{user}}=await supabase.auth.getUser();if(!user)return null;const{data,error}=await supabase.from("sleep_logs").upsert({user_id:user.id,date,sleep_start:sleepStart,wake_up:wakeUp,total_mins:totalMins},{onConflict:"user_id,date"}).select().single();if(error)return null;return data;}
+async function loadGoals(){const{data,error}=await supabase.from("goals").select("*").order("created_at",{ascending:true});if(error)return[];return data.map(r=>({id:r.id,name:r.name,tag:r.tag,targetHours:Number(r.target_hours),startDate:r.start_date,targetDate:r.target_date}));}
+async function insertGoal(name,tag,targetHours,startDate,targetDate){const{data:{user}}=await supabase.auth.getUser();if(!user)return null;const{data,error}=await supabase.from("goals").insert({user_id:user.id,name,tag,target_hours:targetHours,start_date:startDate,target_date:targetDate}).select().single();if(error)return null;return{id:data.id,name:data.name,tag:data.tag,targetHours:Number(data.target_hours),startDate:data.start_date,targetDate:data.target_date};}
+async function deleteGoalDB(id){await supabase.from("goals").delete().eq("id",id);}
 
 // ─── Utilities (IST-aware) ───
 function toIST(d){return new Date(d.toLocaleString("en-US",{timeZone:"Asia/Kolkata"}));}
@@ -406,29 +409,29 @@ async function exportToExcel(sessions){const XLSX=await import("xlsx");const dm=
 
 // ─── Analysis Page ───
 // ─── Goals Page ───
-function GoalsPage({sessions}){
+function GoalsPage({sessions,goals,setGoals}){
   const T=useT();const w=useWindowWidth();const mob=w<480;
-  const[goals,setGoals]=useState(()=>{try{return JSON.parse(localStorage.getItem("fm_goals")||"[]");}catch{return[];}});
   const[selId,setSelId]=useState(()=>localStorage.getItem("fm_selectedGoal")||"");
   const[showAdd,setShowAdd]=useState(false);
-  const[nName,setNName]=useState("");const[nTag,setNTag]=useState("");const[nHrs,setNHrs]=useState("");const[nDate,setNDate]=useState("");
+  const[nName,setNName]=useState("");const[nTag,setNTag]=useState("");const[nHrs,setNHrs]=useState("");const[nStartDate,setNStartDate]=useState(todayStr());const[nDate,setNDate]=useState("");
   const[catchDays,setCatchDays]=useState("");const[catchResult,setCatchResult]=useState(null);
-  useEffect(()=>{localStorage.setItem("fm_goals",JSON.stringify(goals));},[goals]);
   useEffect(()=>{if(selId)localStorage.setItem("fm_selectedGoal",selId);},[selId]);
+  useEffect(()=>{if(goals.length>0&&!goals.find(g=>g.id===selId)){setSelId(goals[0].id);}},[goals]);
   const allTags=[...new Set(sessions.map(s=>s.tag))].sort();
   const goal=goals.find(g=>g.id===selId);
-  const addGoal=()=>{if(!nName.trim()||!nTag||!nHrs||!nDate)return;const g={id:String(Date.now()),name:nName.trim(),tag:nTag,targetHours:parseFloat(nHrs),targetDate:nDate,createdDate:todayStr()};setGoals(p=>[...p,g]);setSelId(g.id);setShowAdd(false);setNName("");setNTag("");setNHrs("");setNDate("");};
-  const delGoal=(id)=>{setGoals(p=>p.filter(g=>g.id!==id));if(selId===id){const rem=goals.filter(g=>g.id!==id);setSelId(rem.length>0?rem[0].id:"");}};
+  const addGoal=async()=>{if(!nName.trim()||!nTag||!nHrs||!nStartDate||!nDate)return;const sv=await insertGoal(nName.trim(),nTag,parseFloat(nHrs),nStartDate,nDate);if(sv){setGoals(p=>[...p,sv]);setSelId(sv.id);}setShowAdd(false);setNName("");setNTag("");setNHrs("");setNStartDate(todayStr());setNDate("");};
+  const delGoal=async(id)=>{await deleteGoalDB(id);setGoals(p=>p.filter(g=>g.id!==id));if(selId===id){const rem=goals.filter(g=>g.id!==id);setSelId(rem.length>0?rem[0].id:"");}};
 
   // Compute stats
   let S=null;
   if(goal){
     const ts=sessions.filter(s=>s.tag===goal.tag);
     const totalMins=ts.reduce((a,s)=>a+s.duration,0);const totalH=totalMins/60;
-    const created=new Date(goal.createdDate+"T12:00:00");const target=new Date(goal.targetDate+"T12:00:00");const today=new Date(todayStr()+"T12:00:00");
-    const dTotal=Math.max(1,Math.ceil((target-created)/86400000));
-    const dElapsed=Math.max(1,Math.ceil((today-created)/86400000));
-    const dRemain=Math.max(0,Math.ceil((target-today)/86400000));
+    const startD=goal.startDate;
+    const created=new Date(startD+"T12:00:00");const target=new Date(goal.targetDate+"T12:00:00");const today=new Date(todayStr()+"T12:00:00");
+    const dTotal=Math.max(1,Math.ceil((target-created)/86400000)+1);
+    const dElapsed=Math.max(1,Math.ceil((today-created)/86400000)+1);
+    const dRemain=Math.max(0,Math.ceil((target-today)/86400000)+1);
     const hRemain=Math.max(0,goal.targetHours-totalH);
     const avgOrig=goal.targetHours/dTotal;
     const avgNow=dRemain>0?hRemain/dRemain:(hRemain>0?99:0);
@@ -477,7 +480,16 @@ function GoalsPage({sessions}){
           <input value={nName} onChange={e=>setNName(e.target.value)} placeholder="Goal name (e.g. CAT Exam Prep)" style={iStyle}/>
           <select value={nTag} onChange={e=>setNTag(e.target.value)} style={selStyle}><option value="">Select tag...</option>{allTags.map(t=>(<option key={t} value={t}>{t}</option>))}</select>
           <input value={nHrs} onChange={e=>setNHrs(e.target.value)} placeholder="Target hours (e.g. 1000)" type="number" style={iStyle}/>
-          <input value={nDate} onChange={e=>setNDate(e.target.value)} type="date" style={iStyle}/>
+          <div style={{display:"flex",gap:8}}>
+            <div style={{flex:1,display:"flex",flexDirection:"column",gap:4}}>
+              <label style={{fontSize:10,fontFamily:F,color:T.tx3,fontWeight:600}}>START DATE</label>
+              <input value={nStartDate} onChange={e=>setNStartDate(e.target.value)} type="date" style={iStyle}/>
+            </div>
+            <div style={{flex:1,display:"flex",flexDirection:"column",gap:4}}>
+              <label style={{fontSize:10,fontFamily:F,color:T.tx3,fontWeight:600}}>END DATE</label>
+              <input value={nDate} onChange={e=>setNDate(e.target.value)} type="date" style={iStyle}/>
+            </div>
+          </div>
         </div>
         <button onClick={addGoal} style={{padding:"10px 28px",border:`2px solid ${T.bd3}`,background:T.btn,color:T.btnT,fontSize:12,fontFamily:F,fontWeight:700,cursor:"pointer",letterSpacing:"0.06em",textTransform:"uppercase"}}>Create Goal</button>
       </div>)}
@@ -495,7 +507,7 @@ function GoalsPage({sessions}){
         <div style={{background:S.sColor+"18",border:`2px solid ${S.sColor}40`,borderRadius:12,padding:mob?"16px":"20px 24px",marginBottom:24,display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:12}}>
           <div>
             <div style={{fontSize:mob?18:22,fontWeight:800,color:T.tx,marginBottom:4}}>{goal.name}</div>
-            <div style={{fontSize:12,color:T.tx2}}>Tag: <strong style={{color:T.tx}}>{goal.tag}</strong> · Deadline: <strong style={{color:T.tx}}>{new Date(goal.targetDate+"T12:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}</strong></div>
+            <div style={{fontSize:12,color:T.tx2}}>Tag: <strong style={{color:T.tx}}>{goal.tag}</strong> · {new Date((goal.startDate)+"T12:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric"})} → <strong style={{color:T.tx}}>{new Date(goal.targetDate+"T12:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}</strong></div>
           </div>
           <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
             <span style={{fontSize:24}}>{S.sEmoji}</span>
@@ -622,7 +634,7 @@ function GoalsPage({sessions}){
         <div style={{fontSize:11,textTransform:"uppercase",letterSpacing:"0.15em",color:T.tx3,fontWeight:600,marginBottom:14}}>Timeline</div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:28}}>
           {[
-            {label:"Started",value:new Date(goal.createdDate+"T12:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric"}),sub:`Day ${S.dElapsed} of ${S.dTotal}`},
+            {label:"Started",value:new Date((goal.startDate)+"T12:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric"}),sub:`Day ${S.dElapsed} of ${S.dTotal}`},
             {label:"Today",value:new Date(todayStr()+"T12:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric"}),sub:`${Math.round(S.dElapsed/S.dTotal*100)}% time elapsed`},
             {label:"Deadline",value:new Date(goal.targetDate+"T12:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric"}),sub:`${S.dRemain} days left`},
           ].map(t=>(<div key={t.label} style={{background:T.bg3,borderRadius:8,padding:"12px",textAlign:"center"}}>
@@ -847,15 +859,15 @@ function SleepPage({sleepLogs,setSleepLogs}){
 // ─── MAIN APP ───
 // ═══════════════════════════════════════════
 export default function App(){
-  const[user,setUser]=useState(null);const[authLoading,setAuthLoading]=useState(true);const[page,setPage]=useState(PAGES.TIMER);const[sessions,setSessions]=useState([]);const[tasks,setTasks]=useState([]);const[sleepLogs,setSleepLogs]=useState([]);const[loaded,setLoaded]=useState(false);const[sidebarOpen,setSidebarOpen]=useState(false);
+  const[user,setUser]=useState(null);const[authLoading,setAuthLoading]=useState(true);const[page,setPage]=useState(PAGES.TIMER);const[sessions,setSessions]=useState([]);const[tasks,setTasks]=useState([]);const[sleepLogs,setSleepLogs]=useState([]);const[goals,setGoals]=useState([]);const[loaded,setLoaded]=useState(false);const[sidebarOpen,setSidebarOpen]=useState(false);
   const[isDark,setIsDark]=useState(()=>localStorage.getItem("fm_theme")==="dark");
   const toggleTheme=()=>{setIsDark(p=>{const n=!p;localStorage.setItem("fm_theme",n?"dark":"light");return n;});};
   const theme=isDark?D:L;const w=useWindowWidth();
   useEffect(()=>{document.body.style.background=theme.bg;document.documentElement.style.background=theme.bg;document.body.style.margin="0";},[isDark]);
   if(typeof document!=="undefined"){document.body.style.background=(localStorage.getItem("fm_theme")==="dark"?"#000":"#fff");document.documentElement.style.background=(localStorage.getItem("fm_theme")==="dark"?"#000":"#fff");}
   useEffect(()=>{supabase.auth.getSession().then(({data:{session}})=>{setUser(session?.user??null);setAuthLoading(false);});const{data:{subscription}}=supabase.auth.onAuthStateChange((_e,session)=>{setUser(session?.user??null);});return()=>subscription.unsubscribe();},[]);
-  useEffect(()=>{if(!user){setSessions([]);setTasks([]);setSleepLogs([]);setLoaded(false);return;}setLoaded(false);Promise.all([loadSessions(),loadTasks(),loadSleepLogs()]).then(([s,t,sl])=>{setSessions(s);setTasks(t);setSleepLogs(sl);setLoaded(true);});},[user]);
-  const handleLogout=async()=>{await supabase.auth.signOut();setUser(null);setSessions([]);setTasks([]);setSleepLogs([]);setLoaded(false);setSidebarOpen(false);};
+  useEffect(()=>{if(!user){setSessions([]);setTasks([]);setSleepLogs([]);setGoals([]);setLoaded(false);return;}setLoaded(false);Promise.all([loadSessions(),loadTasks(),loadSleepLogs(),loadGoals()]).then(([s,t,sl,g])=>{setSessions(s);setTasks(t);setSleepLogs(sl);setGoals(g);setLoaded(true);});},[user]);
+  const handleLogout=async()=>{await supabase.auth.signOut();setUser(null);setSessions([]);setTasks([]);setSleepLogs([]);setGoals([]);setLoaded(false);setSidebarOpen(false);};
   const streak=calcStreak(sessions);const todayMins=sessions.filter(s=>s.date===todayStr()).reduce((a,s)=>a+s.duration,0);
   const getMaxWidth=()=>{if(page===PAGES.CALENDAR)return w<480?"100%":900;if(page===PAGES.GOALS)return w<480?"100%":640;return w<480?"100%":540;};
   const fontLink=<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>;
@@ -870,7 +882,7 @@ export default function App(){
         <Sidebar open={sidebarOpen} onClose={()=>setSidebarOpen(false)} page={page} setPage={setPage} sessions={sessions} onLogout={handleLogout} isDark={isDark} onToggleTheme={toggleTheme}/>
         {page===PAGES.TIMER&&<><WeekStrip sessions={sessions}/><TimerPage sessions={sessions} setSessions={setSessions}/></>}
         {page===PAGES.TASKS&&<div style={{paddingTop:16}}><TasksPage tasks={tasks} setTasks={setTasks}/></div>}
-        {page===PAGES.GOALS&&<div style={{paddingTop:16}}><GoalsPage sessions={sessions}/></div>}
+        {page===PAGES.GOALS&&<div style={{paddingTop:16}}><GoalsPage sessions={sessions} goals={goals} setGoals={setGoals}/></div>}
         {page===PAGES.ANALYSIS&&<div style={{paddingTop:16}}><AnalysisPage sessions={sessions} setSessions={setSessions}/></div>}
         {page===PAGES.CALENDAR&&<CalendarPage sessions={sessions}/>}
         {page===PAGES.REFLECTION&&<div style={{paddingTop:16}}><ReflectionPage sessions={sessions}/></div>}
