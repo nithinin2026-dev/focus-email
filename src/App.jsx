@@ -436,12 +436,16 @@ function GoalsPage({sessions,goals,setGoals}){
     const avgOrig=goal.targetHours/dTotal;
     const avgNow=dRemain>0?hRemain/dRemain:(hRemain>0?99:0);
     const avgActual=totalH/dElapsed;
-    const expected=avgOrig*dElapsed;
-    const ratio=expected>0?totalH/expected:(totalH>0?2:0);
+    const completedDays=Math.max(0,dElapsed-1);
+    const expected=avgOrig*completedDays;
+    const lagH=Math.max(0,expected-totalH);
+    const todayTarget=avgNow;
+    const todayDone=ts.filter(s=>s.date===todayStr()).reduce((a,s)=>a+s.duration,0)/60;
+    const ratio=completedDays>0&&expected>0?totalH/expected:(totalH>0?2:1);
     let status,sColor,sLabel,sEmoji;
     if(totalH>=goal.targetHours){status="done";sColor="#2A9D8F";sLabel="Goal Complete!";sEmoji="🏆";}
-    else if(ratio>=1.0){status="green";sColor="#2A9D8F";sLabel="On Track";sEmoji="🟢";}
-    else if(ratio>=0.8){status="orange";sColor="#F4A261";sLabel="Slightly Behind";sEmoji="🟠";}
+    else if(lagH<=0){status="green";sColor="#2A9D8F";sLabel="On Track";sEmoji="🟢";}
+    else if(lagH<=avgOrig*2){status="orange";sColor="#F4A261";sLabel="Slightly Behind";sEmoji="🟠";}
     else{status="red";sColor="#E63946";sLabel="Behind Schedule";sEmoji="🔴";}
     const progress=Math.min(totalH/goal.targetHours,1);
     const isExpired=dRemain<=0&&status!=="done";
@@ -456,7 +460,7 @@ function GoalsPage({sessions,goals,setGoals}){
     // Last 7 active days for trend
     const last7=wData.filter(d=>d.date<=todayStr());
     const l7Avg=last7.length>0?last7.reduce((a,d)=>a+d.mins,0)/last7.length/60:0;
-    S={totalH,hRemain,dTotal,dElapsed,dRemain,avgOrig,avgNow,avgActual,ratio,status,sColor,sLabel,sEmoji,progress,isExpired,wDays,dLabels,wData,wTotal,tagDT,l7Avg,expected,lagH:Math.max(0,expected-totalH)};
+    S={totalH,hRemain,dTotal,dElapsed,dRemain,avgOrig,avgNow,avgActual,ratio,status,sColor,sLabel,sEmoji,progress,isExpired,wDays,dLabels,wData,wTotal,tagDT,l7Avg,expected,lagH,todayTarget,todayDone,completedDays};
   }
 
   const iStyle={border:`2px solid ${T.bd3}`,padding:"10px 14px",fontSize:14,fontFamily:F,background:"transparent",outline:"none",boxSizing:"border-box",color:T.tx};
@@ -533,11 +537,23 @@ function GoalsPage({sessions,goals,setGoals}){
           </div>
           {/* Stats Grid */}
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+            {/* Today's Target - prominent */}
+            <div style={{background:S.todayDone>=S.todayTarget?"#2A9D8F18":"#F4A26118",borderRadius:8,padding:mob?"12px":"14px 16px",border:`1px solid ${S.todayDone>=S.todayTarget?"#2A9D8F40":"#F4A26140"}`}}>
+              <div style={{fontSize:10,color:T.tx3,textTransform:"uppercase",letterSpacing:"0.1em",fontWeight:600,marginBottom:4}}>Today's Target</div>
+              <div style={{fontSize:mob?18:22,fontWeight:800,color:S.todayDone>=S.todayTarget?"#2A9D8F":"#F4A261"}}>{S.todayTarget>20?"—":`${S.todayTarget.toFixed(1)}h`}</div>
+              <div style={{fontSize:10,color:T.tx2,marginTop:2}}>{S.todayDone.toFixed(1)}h done today</div>
+            </div>
+            {/* Lagging */}
+            <div style={{background:S.lagH>0?"#E6394618":"#2A9D8F18",borderRadius:8,padding:mob?"12px":"14px 16px",border:`1px solid ${S.lagH>0?"#E6394640":"#2A9D8F40"}`}}>
+              <div style={{fontSize:10,color:T.tx3,textTransform:"uppercase",letterSpacing:"0.1em",fontWeight:600,marginBottom:4}}>Lagging By</div>
+              <div style={{fontSize:mob?18:22,fontWeight:800,color:S.lagH>0?"#E63946":"#2A9D8F"}}>{S.lagH.toFixed(1)}h</div>
+              <div style={{fontSize:10,color:T.tx2,marginTop:2}}>{S.lagH>0?`after ${S.completedDays} completed day${S.completedDays!==1?"s":""}`:"you're on track!"}</div>
+            </div>
             {[
               {label:"Logged",value:`${S.totalH.toFixed(1)}h`,sub:`of ${goal.targetHours}h`,color:"#2A9D8F"},
               {label:"Remaining",value:`${S.hRemain.toFixed(1)}h`,sub:`${S.dRemain}d left`,color:"#E63946"},
               {label:"Your Pace",value:`${S.avgActual.toFixed(1)}h/d`,sub:`need ${S.avgNow>20?"—":S.avgNow.toFixed(1)}h/d`,color:S.avgActual>=S.avgNow?"#2A9D8F":"#F4A261"},
-              {label:"Required Now",value:S.avgNow>20?"—":`${S.avgNow.toFixed(1)}h/d`,sub:S.status==="done"?"Done!":S.lagH>0?`behind by ${S.lagH.toFixed(1)}h`:"on track",color:S.avgNow>S.avgOrig*1.5?"#E63946":S.avgNow>S.avgOrig?"#F4A261":"#2A9D8F"},
+              {label:"Required Now",value:S.avgNow>20?"—":`${S.avgNow.toFixed(1)}h/d`,sub:S.status==="done"?"Done!":"to finish on time",color:S.avgNow>S.avgOrig*1.5?"#E63946":S.avgNow>S.avgOrig?"#F4A261":"#2A9D8F"},
             ].map(s=>(<div key={s.label} style={{background:T.bg3,borderRadius:8,padding:mob?"12px":"14px 16px"}}>
               <div style={{fontSize:10,color:T.tx3,textTransform:"uppercase",letterSpacing:"0.1em",fontWeight:600,marginBottom:4}}>{s.label}</div>
               <div style={{fontSize:mob?18:22,fontWeight:800,color:s.color}}>{s.value}</div>
