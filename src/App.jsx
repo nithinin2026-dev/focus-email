@@ -412,6 +412,7 @@ function GoalsPage({sessions}){
   const[selId,setSelId]=useState(()=>localStorage.getItem("fm_selectedGoal")||"");
   const[showAdd,setShowAdd]=useState(false);
   const[nName,setNName]=useState("");const[nTag,setNTag]=useState("");const[nHrs,setNHrs]=useState("");const[nDate,setNDate]=useState("");
+  const[catchDays,setCatchDays]=useState("");const[catchResult,setCatchResult]=useState(null);
   useEffect(()=>{localStorage.setItem("fm_goals",JSON.stringify(goals));},[goals]);
   useEffect(()=>{if(selId)localStorage.setItem("fm_selectedGoal",selId);},[selId]);
   const allTags=[...new Set(sessions.map(s=>s.tag))].sort();
@@ -452,7 +453,7 @@ function GoalsPage({sessions}){
     // Last 7 active days for trend
     const last7=wData.filter(d=>d.date<=todayStr());
     const l7Avg=last7.length>0?last7.reduce((a,d)=>a+d.mins,0)/last7.length/60:0;
-    S={totalH,hRemain,dTotal,dElapsed,dRemain,avgOrig,avgNow,avgActual,ratio,status,sColor,sLabel,sEmoji,progress,isExpired,wDays,dLabels,wData,wTotal,tagDT,l7Avg};
+    S={totalH,hRemain,dTotal,dElapsed,dRemain,avgOrig,avgNow,avgActual,ratio,status,sColor,sLabel,sEmoji,progress,isExpired,wDays,dLabels,wData,wTotal,tagDT,l7Avg,expected,lagH:Math.max(0,expected-totalH)};
   }
 
   const iStyle={border:`2px solid ${T.bd3}`,padding:"10px 14px",fontSize:14,fontFamily:F,background:"transparent",outline:"none",boxSizing:"border-box",color:T.tx};
@@ -464,7 +465,7 @@ function GoalsPage({sessions}){
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20,gap:10,flexWrap:"wrap"}}>
         <div style={{fontSize:11,textTransform:"uppercase",letterSpacing:"0.15em",color:T.tx3,fontWeight:600}}>🎯 Goals</div>
         <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
-          {goals.length>0&&(<select value={selId} onChange={e=>setSelId(e.target.value)} style={{...selStyle,maxWidth:mob?180:260}}>{goals.map(g=>(<option key={g.id} value={g.id}>{g.name}</option>))}</select>)}
+          {goals.length>0&&(<select value={selId} onChange={e=>{setSelId(e.target.value);setCatchDays("");setCatchResult(null);}} style={{...selStyle,maxWidth:mob?180:260}}>{goals.map(g=>(<option key={g.id} value={g.id}>{g.name}</option>))}</select>)}
           <button onClick={()=>setShowAdd(!showAdd)} style={{padding:"10px 18px",border:`2px solid ${T.bd3}`,background:showAdd?"transparent":T.btn,color:showAdd?T.tx:T.btnT,fontSize:12,fontFamily:F,fontWeight:700,cursor:"pointer"}}>{showAdd?"✕":"+ New"}</button>
         </div>
       </div>
@@ -496,9 +497,10 @@ function GoalsPage({sessions}){
             <div style={{fontSize:mob?18:22,fontWeight:800,color:T.tx,marginBottom:4}}>{goal.name}</div>
             <div style={{fontSize:12,color:T.tx2}}>Tag: <strong style={{color:T.tx}}>{goal.tag}</strong> · Deadline: <strong style={{color:T.tx}}>{new Date(goal.targetDate+"T12:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}</strong></div>
           </div>
-          <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
             <span style={{fontSize:24}}>{S.sEmoji}</span>
             <span style={{fontSize:14,fontWeight:700,color:S.sColor}}>{S.sLabel}</span>
+            {S.lagH>0&&S.status!=="done"&&(<span style={{fontSize:11,fontWeight:700,color:"#E63946",background:"#E6394618",padding:"3px 8px",borderRadius:4}}>lagging by {S.lagH.toFixed(1)}h</span>)}
           </div>
         </div>
 
@@ -522,8 +524,8 @@ function GoalsPage({sessions}){
             {[
               {label:"Logged",value:`${S.totalH.toFixed(1)}h`,sub:`of ${goal.targetHours}h`,color:"#2A9D8F"},
               {label:"Remaining",value:`${S.hRemain.toFixed(1)}h`,sub:`${S.dRemain}d left`,color:"#E63946"},
-              {label:"Your Pace",value:`${S.avgActual.toFixed(1)}h/d`,sub:`need ${S.avgOrig.toFixed(1)}h/d`,color:S.avgActual>=S.avgOrig?"#2A9D8F":"#F4A261"},
-              {label:"Required Now",value:S.avgNow>20?"—":`${S.avgNow.toFixed(1)}h/d`,sub:S.status==="done"?"Done!":"to finish on time",color:S.avgNow>S.avgOrig*1.5?"#E63946":S.avgNow>S.avgOrig?"#F4A261":"#2A9D8F"},
+              {label:"Your Pace",value:`${S.avgActual.toFixed(1)}h/d`,sub:`need ${S.avgNow>20?"—":S.avgNow.toFixed(1)}h/d`,color:S.avgActual>=S.avgNow?"#2A9D8F":"#F4A261"},
+              {label:"Required Now",value:S.avgNow>20?"—":`${S.avgNow.toFixed(1)}h/d`,sub:S.status==="done"?"Done!":S.lagH>0?`behind by ${S.lagH.toFixed(1)}h`:"on track",color:S.avgNow>S.avgOrig*1.5?"#E63946":S.avgNow>S.avgOrig?"#F4A261":"#2A9D8F"},
             ].map(s=>(<div key={s.label} style={{background:T.bg3,borderRadius:8,padding:mob?"12px":"14px 16px"}}>
               <div style={{fontSize:10,color:T.tx3,textTransform:"uppercase",letterSpacing:"0.1em",fontWeight:600,marginBottom:4}}>{s.label}</div>
               <div style={{fontSize:mob?18:22,fontWeight:800,color:s.color}}>{s.value}</div>
@@ -543,6 +545,24 @@ function GoalsPage({sessions}){
           </div>
         </div>
 
+        {/* Catch-up Plan */}
+        {S.lagH>0&&S.status!=="done"&&!S.isExpired&&(<div style={{background:T.bg2,border:`1px solid ${T.bd}`,borderRadius:10,padding:mob?16:20,marginBottom:24}}>
+          <div style={{fontSize:11,textTransform:"uppercase",letterSpacing:"0.12em",color:T.tx3,fontWeight:600,marginBottom:14,display:"flex",alignItems:"center",gap:6}}>⚡ Catch-up Plan</div>
+          <div style={{fontSize:13,color:T.tx2,marginBottom:14}}>You're <strong style={{color:"#E63946"}}>{S.lagH.toFixed(1)}h behind</strong> schedule. How many days to get back on track?</div>
+          <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",marginBottom:catchResult?14:0}}>
+            <input value={catchDays} onChange={e=>{setCatchDays(e.target.value);setCatchResult(null);}} placeholder="e.g. 7" type="number" style={{border:`2px solid ${T.bd3}`,padding:"10px 14px",fontSize:14,fontFamily:F,background:"transparent",outline:"none",boxSizing:"border-box",color:T.tx,width:100}}/>
+            <span style={{fontSize:12,color:T.tx3,fontWeight:600}}>days</span>
+            <button onClick={()=>{const d=parseInt(catchDays);if(!d||d<=0)return;const catchPerDay=S.lagH/d;const totalPerDay=catchPerDay+S.avgOrig;setCatchResult({days:d,extra:catchPerDay,total:totalPerDay,normalAfter:S.avgNow});}} style={{padding:"10px 20px",border:`2px solid ${T.bd3}`,background:T.btn,color:T.btnT,fontSize:12,fontFamily:F,fontWeight:700,cursor:"pointer",letterSpacing:"0.06em",textTransform:"uppercase"}}>Calculate</button>
+          </div>
+          {catchResult&&(<div style={{background:S.status==="red"?"#E6394610":"#F4A26110",borderRadius:8,padding:"14px 16px",borderLeft:`4px solid ${S.status==="red"?"#E63946":"#F4A261"}`}}>
+            <div style={{fontSize:13,fontWeight:700,color:T.tx,marginBottom:8}}>Do <span style={{color:"#E63946"}}>{catchResult.total.toFixed(1)}h/day</span> for the next <span style={{color:"#E63946"}}>{catchResult.days} days</span></div>
+            <div style={{fontSize:12,color:T.tx2,lineHeight:1.7}}>
+              Normal pace: {S.avgOrig.toFixed(1)}h/day + Extra catch-up: {catchResult.extra.toFixed(1)}h/day = <strong>{catchResult.total.toFixed(1)}h/day</strong><br/>
+              After {catchResult.days} days, resume normal pace of {S.avgOrig.toFixed(1)}h/day to finish on time.
+            </div>
+          </div>)}
+        </div>)}
+
         {/* Hours Progress Bar */}
         <div style={{marginBottom:28}}>
           <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:T.tx3,fontWeight:600,marginBottom:6}}>
@@ -558,30 +578,34 @@ function GoalsPage({sessions}){
 
         {/* This Week Bar */}
         <div style={{fontSize:11,textTransform:"uppercase",letterSpacing:"0.15em",color:T.tx3,fontWeight:600,marginBottom:14}}>This Week — {goal.tag}</div>
-        <div style={{display:"flex",alignItems:"flex-end",gap:mob?6:10,height:140,paddingTop:16,marginBottom:8}}>
-          {S.wData.map((d,i)=>{
-            const dailyTarget=S.avgOrig*60;const isFut=d.date>todayStr();const h=d.mins>0?Math.max((d.mins/Math.max(dailyTarget*1.5,1))*100,8):isFut?0:4;
-            let bColor;
-            if(isFut)bColor=T.bd;
-            else if(d.mins>=dailyTarget)bColor="#2A9D8F";
-            else if(d.mins>=dailyTarget*0.8)bColor="#F4A261";
-            else bColor=d.mins>0?"#E63946":T.bd2;
-            return(<div key={d.date} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"flex-end",height:140,maxWidth:60}}>
-              {d.mins>0&&!isFut&&<span style={{fontSize:9,fontWeight:700,color:bColor,marginBottom:2}}>{formatHM(d.mins)}</span>}
-              <div style={{width:"65%",height:h,background:bColor,borderRadius:"3px 3px 0 0",minHeight:d.mins>0?6:isFut?0:2,transition:"height 0.3s ease"}}/>
-              <span style={{fontSize:10,fontWeight:600,color:d.date===todayStr()?T.tx:T.tx3,marginTop:4}}>{S.dLabels[i]}</span>
-            </div>);})}
+        <div style={{position:"relative"}}>
+          <div style={{display:"flex",alignItems:"flex-end",gap:mob?6:10,height:140,paddingTop:16,marginBottom:8}}>
+            {S.wData.map((d,i)=>{
+              const dailyTarget=S.avgNow*60;const dailyOrig=S.avgOrig*60;const scaleMax=Math.max(dailyTarget*1.5,Math.max(...S.wData.map(x=>x.mins)),1);const isFut=d.date>todayStr();const h=d.mins>0?Math.max((d.mins/scaleMax)*100,8):isFut?0:4;
+              let bColor;
+              if(isFut)bColor=T.bd;
+              else if(d.mins>=dailyTarget)bColor="#2A9D8F";
+              else if(d.mins>=dailyTarget*0.8)bColor="#F4A261";
+              else bColor=d.mins>0?"#E63946":T.bd2;
+              return(<div key={d.date} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"flex-end",height:140,maxWidth:60}}>
+                {d.mins>0&&!isFut&&<span style={{fontSize:9,fontWeight:700,color:bColor,marginBottom:2}}>{formatHM(d.mins)}</span>}
+                <div style={{width:"65%",height:h,background:bColor,borderRadius:"3px 3px 0 0",minHeight:d.mins>0?6:isFut?0:2,transition:"height 0.3s ease"}}/>
+                <span style={{fontSize:10,fontWeight:600,color:d.date===todayStr()?T.tx:T.tx3,marginTop:4}}>{S.dLabels[i]}</span>
+              </div>);})}
+          </div>
+          {/* Daily target dashed line */}
+          {(()=>{const dailyTarget=S.avgNow*60;const scaleMax=Math.max(dailyTarget*1.5,Math.max(...S.wData.map(x=>x.mins)),1);const linePos=Math.min((dailyTarget/scaleMax)*100,100);return linePos>0&&linePos<=100?(<div style={{position:"absolute",left:0,right:0,bottom:`${8+28+linePos*0.92}px`,borderTop:"2px dashed #E63946",opacity:0.5,pointerEvents:"none"}}><span style={{position:"absolute",right:0,top:-14,fontSize:8,color:"#E63946",fontWeight:700,fontFamily:F}}>{formatHM(Math.round(dailyTarget))}/day needed</span></div>):null;})()}
         </div>
         <div style={{display:"flex",gap:12,fontSize:10,color:T.tx3,marginBottom:8,flexWrap:"wrap"}}>
           <span style={{display:"flex",alignItems:"center",gap:4}}><span style={{width:8,height:8,background:"#2A9D8F",borderRadius:2,display:"inline-block"}}/> On target</span>
           <span style={{display:"flex",alignItems:"center",gap:4}}><span style={{width:8,height:8,background:"#F4A261",borderRadius:2,display:"inline-block"}}/> Within 20%</span>
           <span style={{display:"flex",alignItems:"center",gap:4}}><span style={{width:8,height:8,background:"#E63946",borderRadius:2,display:"inline-block"}}/> Behind</span>
-          <span style={{fontSize:10,color:T.tx4}}>Daily target: {formatHM(Math.round(S.avgOrig*60))}</span>
+          <span style={{display:"flex",alignItems:"center",gap:4}}><span style={{width:12,height:0,borderTop:"2px dashed #E63946",display:"inline-block"}}/> {formatHM(Math.round(S.avgNow*60))}/day needed</span>
         </div>
         <div style={{background:T.bg3,borderRadius:8,padding:"12px 16px",marginBottom:24}}>
           <span style={{fontSize:12,fontWeight:600,color:T.tx}}>Week total: {formatHM(S.wTotal)}</span>
-          <span style={{fontSize:12,color:T.tx3,marginLeft:8}}>· Need {formatHM(Math.round(S.avgOrig*60*7))}/week</span>
-          {S.wTotal>=Math.round(S.avgOrig*60*7)?<span style={{marginLeft:8}}>🔥</span>:<span style={{marginLeft:8,color:"#E63946",fontSize:11,fontWeight:600}}> — {formatHM(Math.max(0,Math.round(S.avgOrig*60*7)-S.wTotal))} short</span>}
+          <span style={{fontSize:12,color:T.tx3,marginLeft:8}}>· Need {formatHM(Math.round(S.avgNow*60*7))}/week</span>
+          {S.wTotal>=Math.round(S.avgNow*60*7)?<span style={{marginLeft:8}}>🔥</span>:<span style={{marginLeft:8,color:"#E63946",fontSize:11,fontWeight:600}}> — {formatHM(Math.max(0,Math.round(S.avgNow*60*7)-S.wTotal))} short</span>}
         </div>
 
         {/* Timeline */}
