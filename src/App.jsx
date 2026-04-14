@@ -423,7 +423,6 @@ function GoalsPage({sessions,goals,setGoals}){
   const[selId,setSelId]=useState(()=>localStorage.getItem("fm_selectedGoal")||"");
   const[showAdd,setShowAdd]=useState(false);
   const[nName,setNName]=useState("");const[nTag,setNTag]=useState("");const[nHrs,setNHrs]=useState("");const[nStartDate,setNStartDate]=useState(todayStr());const[nDate,setNDate]=useState("");
-  const[catchDays,setCatchDays]=useState("");const[catchResult,setCatchResult]=useState(null);
   const[projMins,setProjMins]=useState({});
   useEffect(()=>{if(selId)localStorage.setItem("fm_selectedGoal",selId);},[selId]);
   useEffect(()=>{if(goals.length>0&&!goals.find(g=>g.id===selId)){setSelId(goals[0].id);}},[goals]);
@@ -497,7 +496,7 @@ function GoalsPage({sessions,goals,setGoals}){
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20,gap:10,flexWrap:"wrap"}}>
         <div style={{fontSize:11,textTransform:"uppercase",letterSpacing:"0.15em",color:T.tx3,fontWeight:600}}>🎯 Goals</div>
         <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
-          {goals.length>0&&(<select value={selId} onChange={e=>{setSelId(e.target.value);setCatchDays("");setCatchResult(null);setProjMins({});}} style={{...selStyle,maxWidth:mob?180:260}}>{goals.map(g=>(<option key={g.id} value={g.id}>{g.name}</option>))}</select>)}
+          {goals.length>0&&(<select value={selId} onChange={e=>{setSelId(e.target.value);setProjMins({});}} style={{...selStyle,maxWidth:mob?180:260}}>{goals.map(g=>(<option key={g.id} value={g.id}>{g.name}</option>))}</select>)}
           <button onClick={()=>setShowAdd(!showAdd)} style={{padding:"10px 18px",border:`2px solid ${T.bd3}`,background:showAdd?"transparent":T.btn,color:showAdd?T.tx:T.btnT,fontSize:12,fontFamily:F,fontWeight:700,cursor:"pointer"}}>{showAdd?"✕":"+ New"}</button>
         </div>
       </div>
@@ -536,7 +535,7 @@ function GoalsPage({sessions,goals,setGoals}){
         <div style={{background:S.sColor+"18",border:`2px solid ${S.sColor}40`,borderRadius:12,padding:mob?"16px":"20px 24px",marginBottom:24,display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:12}}>
           <div>
             <div style={{fontSize:mob?18:22,fontWeight:800,color:T.tx,marginBottom:4}}>{goal.name}</div>
-            <div style={{fontSize:12,color:T.tx2}}>Tag: <strong style={{color:T.tx}}>{goal.tag}</strong> · {new Date((goal.startDate)+"T12:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric"})} → <strong style={{color:T.tx}}>{new Date(goal.targetDate+"T12:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}</strong></div>
+            {S.status!=="done"&&!S.isExpired&&(()=>{const projPct=Math.round((S.avgActual*S.dTotal)/goal.targetHours*100);const pColor=projPct>=90?"#2A9D8F":projPct>=70?"#F4A261":"#E63946";return(<div style={{fontSize:12,fontWeight:600,color:pColor,marginTop:2}}>{projPct>=100?`📈 Current pace → ${projPct}% of goal`:`⚠ Current pace → only ${projPct}% of goal`}</div>);})()}
           </div>
           <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
             <span style={{fontSize:24}}>{S.sEmoji}</span>
@@ -577,74 +576,6 @@ function GoalsPage({sessions,goals,setGoals}){
               <div style={{fontSize:10,color:T.tx2,marginTop:2}}>{s.sub}</div>
             </div>))}
           </div>
-        </div>
-
-        {/* Projection Message */}
-        <div style={{background:S.status==="done"?"#2A9D8F18":S.status==="green"?"#2A9D8F10":S.status==="orange"?"#F4A26118":"#E6394618",borderRadius:8,padding:"14px 18px",marginBottom:24,borderLeft:`4px solid ${S.sColor}`}}>
-          <div style={{fontSize:13,fontWeight:600,color:T.tx,lineHeight:1.6}}>
-            {S.status==="done"?("🏆 Congratulations! You've completed this goal!"):
-            S.isExpired?(`⏰ Deadline passed. You logged ${S.totalH.toFixed(1)}h of ${goal.targetHours}h. Consider extending the deadline.`):
-            S.status==="green"?(`At your current pace of ${S.avgActual.toFixed(1)}h/day, you're on track to hit ${goal.targetHours}h${S.avgActual>S.avgOrig?" ahead of schedule":""}. Keep it up!`):
-            S.status==="orange"?(`⚠️ Slightly behind — total debt: ${S.lagH.toFixed(1)}h. You need ${S.avgNow.toFixed(1)}h/day for ${S.dRemain} days.`):
-            (`🚨 Behind by ${S.lagH.toFixed(1)}h. You need ${S.avgNow.toFixed(1)}h/day for ${S.dRemain} days — ${(S.avgNow/S.avgOrig).toFixed(1)}x your original pace.`)}
-          </div>
-        </div>
-
-        {/* Projected Reach */}
-        {S.status!=="done"&&!S.isExpired&&(()=>{
-          const projH=Math.round(S.avgActual*S.dTotal);
-          const projPct=Math.round((S.avgActual*S.dTotal)/goal.targetHours*100);
-          const pColor=projPct>=90?"#2A9D8F":projPct>=70?"#F4A261":"#E63946";
-          return(
-            <div style={{background:pColor+"15",borderRadius:8,padding:"12px 18px",marginBottom:24,borderLeft:`4px solid ${pColor}`}}>
-              <div style={{fontSize:13,fontWeight:600,color:T.tx,lineHeight:1.6}}>
-                {projPct>=100?`📈 At your current pace you'll reach `:`⚠ At your current pace you'll only reach `}
-                <strong style={{color:pColor}}>{projH}h</strong>
-                {projPct>=100?` out of ${goal.targetHours}h — that's `:" instead of "}<strong>{projPct<100?`${goal.targetHours}h`:""}</strong>
-                {projPct<100?", which is only ":""}
-                <strong style={{color:pColor}}>{projPct}%</strong> of your goal.
-              </div>
-            </div>);
-        })()}
-
-        {/* Comfort Pace Recommendation */}
-        {(S.status==="orange"||S.status==="red")&&!S.isExpired&&S.todayForComfort>0&&(
-          <div style={{background:"#6A4C9318",borderRadius:8,padding:"14px 18px",marginBottom:24,borderLeft:"4px solid #6A4C93"}}>
-            <div style={{fontSize:13,fontWeight:600,color:T.tx,lineHeight:1.6}}>
-              💡 Do <strong style={{color:"#6A4C93"}}>{formatHM(S.todayForComfort)}</strong> today → rest of the week at your comfort pace of <strong style={{color:"#2A9D8F"}}>{formatHM(S.comfortPaceMins)}/day</strong> ({S._remainAfterToday}d).
-            </div>
-          </div>
-        )}
-
-        {/* Catch-up Plan */}
-        {S.lagH>0&&(S.status==="orange"||S.status==="red")&&!S.isExpired&&(<div style={{background:T.bg2,border:`1px solid ${T.bd}`,borderRadius:10,padding:mob?16:20,marginBottom:24}}>
-          <div style={{fontSize:11,textTransform:"uppercase",letterSpacing:"0.12em",color:T.tx3,fontWeight:600,marginBottom:14,display:"flex",alignItems:"center",gap:6}}>⚡ Catch-up Plan</div>
-          <div style={{fontSize:13,color:T.tx2,marginBottom:14}}>You're <strong style={{color:"#E63946"}}>{S.lagH.toFixed(1)}h behind</strong> schedule. How many days to get back on track?</div>
-          <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",marginBottom:catchResult?14:0}}>
-            <input value={catchDays} onChange={e=>{setCatchDays(e.target.value);setCatchResult(null);}} placeholder="e.g. 7" type="number" style={{border:`2px solid ${T.bd3}`,padding:"10px 14px",fontSize:14,fontFamily:F,background:"transparent",outline:"none",boxSizing:"border-box",color:T.tx,width:100}}/>
-            <span style={{fontSize:12,color:T.tx3,fontWeight:600}}>days</span>
-            <button onClick={()=>{const d=parseInt(catchDays);if(!d||d<=0)return;const catchPerDay=S.lagH/d;const totalPerDay=catchPerDay+S.avgOrig;setCatchResult({days:d,extra:catchPerDay,total:totalPerDay,normalAfter:S.avgNow});}} style={{padding:"10px 20px",border:`2px solid ${T.bd3}`,background:T.btn,color:T.btnT,fontSize:12,fontFamily:F,fontWeight:700,cursor:"pointer",letterSpacing:"0.06em",textTransform:"uppercase"}}>Calculate</button>
-          </div>
-          {catchResult&&(<div style={{background:S.status==="red"?"#E6394610":"#F4A26110",borderRadius:8,padding:"14px 16px",borderLeft:`4px solid ${S.status==="red"?"#E63946":"#F4A261"}`}}>
-            <div style={{fontSize:13,fontWeight:700,color:T.tx,marginBottom:8}}>Do <span style={{color:"#E63946"}}>{catchResult.total.toFixed(1)}h/day</span> for the next <span style={{color:"#E63946"}}>{catchResult.days} days</span></div>
-            <div style={{fontSize:12,color:T.tx2,lineHeight:1.7}}>
-              Normal pace: {S.avgOrig.toFixed(1)}h/day + Extra catch-up: {catchResult.extra.toFixed(1)}h/day = <strong>{catchResult.total.toFixed(1)}h/day</strong><br/>
-              After {catchResult.days} days, resume normal pace of {S.avgOrig.toFixed(1)}h/day to finish on time.
-            </div>
-          </div>)}
-        </div>)}
-
-        {/* Hours Progress Bar */}
-        <div style={{marginBottom:28}}>
-          <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:T.tx3,fontWeight:600,marginBottom:6}}>
-            <span>{S.totalH.toFixed(1)}h logged</span><span>{goal.targetHours}h target</span>
-          </div>
-          <div style={{height:12,background:T.bd,borderRadius:6,overflow:"hidden",position:"relative"}}>
-            <div style={{height:"100%",width:`${S.progress*100}%`,background:`linear-gradient(90deg,${S.sColor},${S.sColor}cc)`,borderRadius:6,transition:"width 0.6s ease"}}/>
-            {/* Expected marker */}
-            {!S.isExpired&&S.status!=="done"&&(<div style={{position:"absolute",top:-2,bottom:-2,left:`${Math.min((S.dElapsed/S.dTotal)*100,100)}%`,width:2,background:T.tx,opacity:0.4}} title="Where you should be"/>)}
-          </div>
-          <div style={{fontSize:10,color:T.tx4,marginTop:4}}>▏= expected progress by today</div>
         </div>
 
         {/* This Week Bar */}
