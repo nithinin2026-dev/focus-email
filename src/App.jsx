@@ -615,7 +615,8 @@ function GoalsPage({sessions,goals,setGoals}){
           const weeklyNeedMins=Math.round(S.avgNow*60*7);
           const wRemainMins=Math.max(0,weeklyNeedMins-S.wTotal);
           const todayIdx=S.wDays.findIndex(d=>d===todayStr());
-          const remainDays=Math.max(1,todayIdx>=0?7-todayIdx:7);
+          // const remainDays=Math.max(1,todayIdx>=0?7-todayIdx:7);
+          const remainDays=Math.max(1,todayIdx>=0?7-todayIdx-1:7);
           const dynamicDaily=Math.round(wRemainMins/remainDays);
           const scaleMax=Math.max(dynamicDaily*1.5,Math.max(...S.wData.map(x=>x.mins)),1);
           return(<>
