@@ -589,6 +589,23 @@ function GoalsPage({sessions,goals,setGoals}){
           </div>
         </div>
 
+        {/* Projected Reach */}
+        {S.status!=="done"&&!S.isExpired&&(()=>{
+          const projH=Math.round(S.avgActual*S.dTotal);
+          const projPct=Math.round((S.avgActual*S.dTotal)/goal.targetHours*100);
+          const pColor=projPct>=90?"#2A9D8F":projPct>=70?"#F4A261":"#E63946";
+          return(
+            <div style={{background:pColor+"15",borderRadius:8,padding:"12px 18px",marginBottom:24,borderLeft:`4px solid ${pColor}`}}>
+              <div style={{fontSize:13,fontWeight:600,color:T.tx,lineHeight:1.6}}>
+                {projPct>=100?`📈 At your current pace you'll reach `:`⚠ At your current pace you'll only reach `}
+                <strong style={{color:pColor}}>{projH}h</strong>
+                {projPct>=100?` out of ${goal.targetHours}h — that's `:" instead of "}<strong>{projPct<100?`${goal.targetHours}h`:""}</strong>
+                {projPct<100?", which is only ":""}
+                <strong style={{color:pColor}}>{projPct}%</strong> of your goal.
+              </div>
+            </div>);
+        })()}
+
         {/* Comfort Pace Recommendation */}
         {(S.status==="orange"||S.status==="red")&&!S.isExpired&&S.todayForComfort>0&&(
           <div style={{background:"#6A4C9318",borderRadius:8,padding:"14px 18px",marginBottom:24,borderLeft:"4px solid #6A4C93"}}>
