@@ -455,6 +455,7 @@ function GoalsPage({sessions,goals,setGoals}){
     const previousLag=Math.max(0,previousExpected-previousLogged);
     const todayRemaining=Math.max(0,avgOrig-todayLoggedH);
     const lagH=previousLag+todayRemaining;
+    const leadH=Math.max(0,totalH-expected);
     let status,sColor,sLabel,sEmoji;
     if(totalH>=goal.targetHours){status="done";sColor="#2A9D8F";sLabel="Goal Complete!";sEmoji="🏆";}
     else if(ratio>=1.0){status="green";sColor="#2A9D8F";sLabel="On Track";sEmoji="🟢";}
@@ -473,7 +474,7 @@ function GoalsPage({sessions,goals,setGoals}){
     // Last 7 active days for trend
     const last7=wData.filter(d=>d.date<=todayStr());
     const l7Avg=last7.length>0?last7.reduce((a,d)=>a+d.mins,0)/last7.length/60:0;
-    S={totalH,hRemain,dTotal,dElapsed,dRemain,avgOrig,avgNow,avgActual,ratio,status,sColor,sLabel,sEmoji,progress,isExpired,wDays,dLabels,wData,wTotal,tagDT,l7Avg,expected,lagH};
+    S={totalH,hRemain,dTotal,dElapsed,dRemain,avgOrig,avgNow,avgActual,ratio,status,sColor,sLabel,sEmoji,progress,isExpired,wDays,dLabels,wData,wTotal,tagDT,l7Avg,expected,lagH,leadH};
   }
 
   const iStyle={border:`2px solid ${T.bd3}`,padding:"10px 14px",fontSize:14,fontFamily:F,background:"transparent",outline:"none",boxSizing:"border-box",color:T.tx};
@@ -529,7 +530,11 @@ function GoalsPage({sessions,goals,setGoals}){
           <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
             <span style={{fontSize:24}}>{S.sEmoji}</span>
             <span style={{fontSize:14,fontWeight:700,color:S.sColor}}>{S.sLabel}</span>
-            {S.lagH>0&&S.status!=="done"&&(<span style={{fontSize:11,fontWeight:700,color:"#E63946",background:"#E6394618",padding:"3px 8px",borderRadius:4}}>lagging by {S.lagH.toFixed(1)}h</span>)}
+            {S.status!=="done"&&(S.status==="green"?(
+              <span style={{fontSize:11,fontWeight:700,color:"#2A9D8F",background:"#2A9D8F18",padding:"3px 8px",borderRadius:4}}>{S.leadH>0?`leading by ${S.leadH.toFixed(1)}h`:"on track"}</span>
+            ):S.lagH>0?(
+              <span style={{fontSize:11,fontWeight:700,color:"#E63946",background:"#E6394618",padding:"3px 8px",borderRadius:4}}>lagging by {S.lagH.toFixed(1)}h</span>
+            ):null)}
           </div>
         </div>
 
@@ -554,7 +559,7 @@ function GoalsPage({sessions,goals,setGoals}){
               {label:"Logged",value:`${S.totalH.toFixed(1)}h`,sub:`of ${goal.targetHours}h`,color:"#2A9D8F"},
               {label:"Remaining",value:`${S.hRemain.toFixed(1)}h`,sub:`${S.dRemain}d left`,color:"#E63946"},
               {label:"Your Pace",value:`${S.avgActual.toFixed(1)}h/d`,sub:`need ${S.avgNow>20?"—":S.avgNow.toFixed(1)}h/d`,color:S.avgActual>=S.avgNow?"#2A9D8F":"#F4A261"},
-              {label:"Required Now",value:S.avgNow>20?"—":`${S.avgNow.toFixed(1)}h/d`,sub:S.status==="done"?"Done!":S.lagH>0?`behind by ${S.lagH.toFixed(1)}h`:"on track",color:S.avgNow>S.avgOrig*1.5?"#E63946":S.avgNow>S.avgOrig?"#F4A261":"#2A9D8F"},
+              {label:"Required Now",value:S.avgNow>20?"—":`${S.avgNow.toFixed(1)}h/d`,sub:S.status==="done"?"Done!":S.status==="green"?(S.leadH>0?`leading by ${S.leadH.toFixed(1)}h`:"on track"):S.lagH>0?`behind by ${S.lagH.toFixed(1)}h`:"on track",color:S.avgNow>S.avgOrig*1.5?"#E63946":S.avgNow>S.avgOrig?"#F4A261":"#2A9D8F"},
             ].map(s=>(<div key={s.label} style={{background:T.bg3,borderRadius:8,padding:mob?"12px":"14px 16px"}}>
               <div style={{fontSize:10,color:T.tx3,textTransform:"uppercase",letterSpacing:"0.1em",fontWeight:600,marginBottom:4}}>{s.label}</div>
               <div style={{fontSize:mob?18:22,fontWeight:800,color:s.color}}>{s.value}</div>
@@ -575,7 +580,7 @@ function GoalsPage({sessions,goals,setGoals}){
         </div>
 
         {/* Catch-up Plan */}
-        {S.lagH>0&&S.status!=="done"&&!S.isExpired&&(<div style={{background:T.bg2,border:`1px solid ${T.bd}`,borderRadius:10,padding:mob?16:20,marginBottom:24}}>
+        {S.lagH>0&&(S.status==="orange"||S.status==="red")&&!S.isExpired&&(<div style={{background:T.bg2,border:`1px solid ${T.bd}`,borderRadius:10,padding:mob?16:20,marginBottom:24}}>
           <div style={{fontSize:11,textTransform:"uppercase",letterSpacing:"0.12em",color:T.tx3,fontWeight:600,marginBottom:14,display:"flex",alignItems:"center",gap:6}}>⚡ Catch-up Plan</div>
           <div style={{fontSize:13,color:T.tx2,marginBottom:14}}>You're <strong style={{color:"#E63946"}}>{S.lagH.toFixed(1)}h behind</strong> schedule. How many days to get back on track?</div>
           <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",marginBottom:catchResult?14:0}}>
