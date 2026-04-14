@@ -54,6 +54,7 @@ function playStopPop(){try{Tone.start();const s=new Tone.Synth({oscillator:{type
 async function loadSessions(){const{data,error}=await supabase.from("sessions").select("*").order("ts",{ascending:true});if(error)return[];return data.map(r=>({id:r.id,tag:r.tag,duration:r.duration,date:r.date,ts:Number(r.ts)}));}
 async function insertSession(session){const{data:{user}}=await supabase.auth.getUser();if(!user)return null;const{data,error}=await supabase.from("sessions").insert({user_id:user.id,tag:session.tag,duration:session.duration,date:session.date,ts:session.ts}).select().single();if(error)return null;return data;}
 async function deleteSession(id){await supabase.from("sessions").delete().eq("id",id);}
+async function updateSessionTag(id,newTag){await supabase.from("sessions").update({tag:newTag}).eq("id",id);}
 async function loadReflections(){const{data,error}=await supabase.from("reflections").select("*");if(error)return{};const m={};data.forEach(r=>{m[r.date]={note:r.note||"",hrsOverride:r.hrs_override};});return m;}
 async function upsertReflection(date,note,hrsOverride){const{data:{user}}=await supabase.auth.getUser();if(!user)return;await supabase.from("reflections").upsert({user_id:user.id,date,note,hrs_override:hrsOverride},{onConflict:"user_id,date"});}
 async function loadTasks(){const{data,error}=await supabase.from("tasks").select("*").order("created_at",{ascending:true});if(error)return[];return data;}
@@ -261,6 +262,7 @@ function TimerPage({sessions,setSessions}){
   const[breakMins,setBreakMins]=useState(()=>Number(sessionStorage.getItem("sl_breakMins"))||5);
   const[editing,setEditing]=useState(false);const[tempFocus,setTempFocus]=useState("25");const[tempBreak,setTempBreak]=useState("5");
   const focusDur=focusMins*60;const breakDur=breakMins*60;const intervalRef=useRef(null);const startTimeRef=useRef(null);const loggedRef=useRef(false);
+  const[editSessId,setEditSessId]=useState(null);const[editSessTag,setEditSessTag]=useState("");
   useEffect(()=>{sessionStorage.setItem("sl_tag",tag);},[tag]);
   useEffect(()=>{sessionStorage.setItem("sl_mode",mode);},[mode]);
   useEffect(()=>{sessionStorage.setItem("sl_focusMins",String(focusMins));},[focusMins]);
@@ -282,6 +284,7 @@ function TimerPage({sessions,setSessions}){
   const tSess=sessions.filter(s=>s.date===todayStr());const tTotal=tSess.reduce((a,s)=>a+s.duration,0);
   const cSz=mob?200:220;const cR=mob?80:90;const cC=2*Math.PI*cR;
   const iStyle={border:`2px solid ${T.bd3}`,padding:"10px 14px",fontSize:14,fontFamily:F,background:"transparent",outline:"none",boxSizing:"border-box",color:T.tx};
+  const renameSession=async(s,newTag)=>{if(!newTag.trim()||newTag.trim()===s.tag){setEditSessId(null);return;}await updateSessionTag(s.id,newTag.trim());setSessions(p=>p.map(x=>x.id===s.id?{...x,tag:newTag.trim()}:x));setEditSessId(null);};
   return(
     <div>
       <div style={{textAlign:"center",marginBottom:30}}>
@@ -334,7 +337,14 @@ function TimerPage({sessions,setSessions}){
           <span style={{fontSize:14,fontFamily:F,fontWeight:700,color:T.tx}}>{formatHM(tTotal)} {tTotal>=120&&"🔥"}</span>
         </div>
         {tSess.length===0&&(<div style={{color:T.tx4,fontFamily:F,fontSize:13,padding:"20px 0",textAlign:"center"}}>No sessions yet. Start studying!</div>)}
-        {tSess.map(s=>(<div key={s.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:`1px solid ${T.bd}`,fontFamily:F,fontSize:14}}><span style={{fontWeight:600,color:T.tx}}>{s.tag}</span><span style={{color:T.tx3}}>{formatHM(s.duration)}</span></div>))}
+        {tSess.map(s=>(<div key={s.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:`1px solid ${T.bd}`,fontFamily:F,fontSize:14}}>
+          {editSessId===s.id?(
+            <input autoFocus value={editSessTag} onChange={e=>setEditSessTag(e.target.value)} onBlur={()=>renameSession(s,editSessTag)} onKeyDown={e=>{if(e.key==="Enter")renameSession(s,editSessTag);if(e.key==="Escape")setEditSessId(null);}} style={{border:"none",borderBottom:`2px solid ${T.bd3}`,background:"transparent",fontSize:14,fontFamily:F,fontWeight:600,outline:"none",color:T.tx,padding:"2px 0",flex:1,marginRight:8}}/>
+          ):(
+            <span onClick={()=>{setEditSessId(s.id);setEditSessTag(s.tag);}} style={{fontWeight:600,color:T.tx,cursor:"pointer"}} title="Click to rename">{s.tag}</span>
+          )}
+          <span style={{color:T.tx3}}>{formatHM(s.duration)}</span>
+        </div>))}
       </div>
       <div style={{marginTop:48,padding:"14px 20px",borderRadius:12,background:T.ftBg,display:"flex",alignItems:"center",justifyContent:"center"}}>
         <span style={{fontSize:13,fontWeight:600,color:T.ftC,letterSpacing:"0.01em"}}>Vibe coded by Nithin Chowdary <span style={{color:"#E53E3E",fontSize:15}}>❤️</span></span>
@@ -407,7 +417,6 @@ function PeriodBarChart({dates,sessions}){const T=useT();const dt=getDayTotals(s
 // ─── Excel Export ───
 async function exportToExcel(sessions){const XLSX=await import("xlsx");const dm={};sessions.forEach(s=>{dm[s.date]=(dm[s.date]||0)+s.duration;});const dd=Object.entries(dm).sort((a,b)=>a[0].localeCompare(b[0])).map(([date,mins])=>({Date:date,Day:new Date(date+"T12:00:00").toLocaleDateString("en-US",{weekday:"long"}),Hours:+(mins/60).toFixed(2),Status:mins>=120?"🔥":"❌"}));const wm={};Object.entries(dm).forEach(([date,mins])=>{const d=new Date(date+"T12:00:00");const m=new Date(d);m.setDate(d.getDate()-((d.getDay()+6)%7));const s=new Date(m);s.setDate(m.getDate()+6);const l=`${m.toLocaleDateString("en-US",{month:"short",day:"numeric"})} - ${s.toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}`;wm[l]=(wm[l]||0)+mins;});const wd=Object.entries(wm).map(([w,m])=>({Week:w,Hours:+(m/60).toFixed(2)}));const mm={};Object.entries(dm).forEach(([date,mins])=>{const k=date.slice(0,7);mm[k]=(mm[k]||0)+mins;});const md=Object.entries(mm).sort((a,b)=>a[0].localeCompare(b[0])).map(([k,m])=>{const[y,mo]=k.split("-");return{Month:new Date(parseInt(y),parseInt(mo)-1).toLocaleDateString("en-US",{month:"long",year:"numeric"}),Hours:+(m/60).toFixed(2)};});const tm={};const tf={};sessions.forEach(s=>{tm[s.tag]=(tm[s.tag]||0)+s.duration;if(!tf[s.tag]||s.date<tf[s.tag])tf[s.tag]=s.date;});const td=Object.entries(tm).sort((a,b)=>b[1]-a[1]).map(([t,m])=>({Topic:t,Hours:+(m/60).toFixed(2),Started:tf[t]||""}));const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(dd),"Day-wise");XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(wd),"Week-wise");XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(md),"Month-wise");XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(td),"Topic-wise");XLSX.writeFile(wb,`FocusMaxing_Export_${todayStr()}.xlsx`);}
 
-// ─── Analysis Page ───
 // ─── Goals Page ───
 function GoalsPage({sessions,goals,setGoals}){
   const T=useT();const w=useWindowWidth();const mob=w<480;
@@ -436,16 +445,20 @@ function GoalsPage({sessions,goals,setGoals}){
     const avgOrig=goal.targetHours/dTotal;
     const avgNow=dRemain>0?hRemain/dRemain:(hRemain>0?99:0);
     const avgActual=totalH/dElapsed;
-    const completedDays=Math.max(0,dElapsed-1);
-    const expected=avgOrig*completedDays;
-    const lagH=Math.max(0,expected-totalH);
-    const todayTarget=avgNow;
-    const todayDone=ts.filter(s=>s.date===todayStr()).reduce((a,s)=>a+s.duration,0)/60;
-    const ratio=completedDays>0&&expected>0?totalH/expected:(totalH>0?2:1);
+    const expected=avgOrig*dElapsed;
+    const ratio=expected>0?totalH/expected:(totalH>0?2:0);
+    // ── FIX: Lag = previous buildup debt + today's remaining target ──
+    const todayLoggedMins=ts.filter(s=>s.date===todayStr()).reduce((a,s)=>a+s.duration,0);
+    const todayLoggedH=todayLoggedMins/60;
+    const previousExpected=avgOrig*(dElapsed-1);
+    const previousLogged=totalH-todayLoggedH;
+    const previousLag=Math.max(0,previousExpected-previousLogged);
+    const todayRemaining=Math.max(0,avgOrig-todayLoggedH);
+    const lagH=previousLag+todayRemaining;
     let status,sColor,sLabel,sEmoji;
     if(totalH>=goal.targetHours){status="done";sColor="#2A9D8F";sLabel="Goal Complete!";sEmoji="🏆";}
-    else if(lagH<=0){status="green";sColor="#2A9D8F";sLabel="On Track";sEmoji="🟢";}
-    else if(lagH<=avgOrig*2){status="orange";sColor="#F4A261";sLabel="Slightly Behind";sEmoji="🟠";}
+    else if(ratio>=1.0){status="green";sColor="#2A9D8F";sLabel="On Track";sEmoji="🟢";}
+    else if(ratio>=0.8){status="orange";sColor="#F4A261";sLabel="Slightly Behind";sEmoji="🟠";}
     else{status="red";sColor="#E63946";sLabel="Behind Schedule";sEmoji="🔴";}
     const progress=Math.min(totalH/goal.targetHours,1);
     const isExpired=dRemain<=0&&status!=="done";
@@ -460,7 +473,7 @@ function GoalsPage({sessions,goals,setGoals}){
     // Last 7 active days for trend
     const last7=wData.filter(d=>d.date<=todayStr());
     const l7Avg=last7.length>0?last7.reduce((a,d)=>a+d.mins,0)/last7.length/60:0;
-    S={totalH,hRemain,dTotal,dElapsed,dRemain,avgOrig,avgNow,avgActual,ratio,status,sColor,sLabel,sEmoji,progress,isExpired,wDays,dLabels,wData,wTotal,tagDT,l7Avg,expected,lagH,todayTarget,todayDone,completedDays};
+    S={totalH,hRemain,dTotal,dElapsed,dRemain,avgOrig,avgNow,avgActual,ratio,status,sColor,sLabel,sEmoji,progress,isExpired,wDays,dLabels,wData,wTotal,tagDT,l7Avg,expected,lagH};
   }
 
   const iStyle={border:`2px solid ${T.bd3}`,padding:"10px 14px",fontSize:14,fontFamily:F,background:"transparent",outline:"none",boxSizing:"border-box",color:T.tx};
@@ -537,23 +550,11 @@ function GoalsPage({sessions,goals,setGoals}){
           </div>
           {/* Stats Grid */}
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-            {/* Today's Target - prominent */}
-            <div style={{background:S.todayDone>=S.todayTarget?"#2A9D8F18":"#F4A26118",borderRadius:8,padding:mob?"12px":"14px 16px",border:`1px solid ${S.todayDone>=S.todayTarget?"#2A9D8F40":"#F4A26140"}`}}>
-              <div style={{fontSize:10,color:T.tx3,textTransform:"uppercase",letterSpacing:"0.1em",fontWeight:600,marginBottom:4}}>Today's Target</div>
-              <div style={{fontSize:mob?18:22,fontWeight:800,color:S.todayDone>=S.todayTarget?"#2A9D8F":"#F4A261"}}>{S.todayTarget>20?"—":`${S.todayTarget.toFixed(1)}h`}</div>
-              <div style={{fontSize:10,color:T.tx2,marginTop:2}}>{S.todayDone.toFixed(1)}h done today</div>
-            </div>
-            {/* Lagging */}
-            <div style={{background:S.lagH>0?"#E6394618":"#2A9D8F18",borderRadius:8,padding:mob?"12px":"14px 16px",border:`1px solid ${S.lagH>0?"#E6394640":"#2A9D8F40"}`}}>
-              <div style={{fontSize:10,color:T.tx3,textTransform:"uppercase",letterSpacing:"0.1em",fontWeight:600,marginBottom:4}}>Lagging By</div>
-              <div style={{fontSize:mob?18:22,fontWeight:800,color:S.lagH>0?"#E63946":"#2A9D8F"}}>{S.lagH.toFixed(1)}h</div>
-              <div style={{fontSize:10,color:T.tx2,marginTop:2}}>{S.lagH>0?`after ${S.completedDays} completed day${S.completedDays!==1?"s":""}`:"you're on track!"}</div>
-            </div>
             {[
               {label:"Logged",value:`${S.totalH.toFixed(1)}h`,sub:`of ${goal.targetHours}h`,color:"#2A9D8F"},
               {label:"Remaining",value:`${S.hRemain.toFixed(1)}h`,sub:`${S.dRemain}d left`,color:"#E63946"},
               {label:"Your Pace",value:`${S.avgActual.toFixed(1)}h/d`,sub:`need ${S.avgNow>20?"—":S.avgNow.toFixed(1)}h/d`,color:S.avgActual>=S.avgNow?"#2A9D8F":"#F4A261"},
-              {label:"Required Now",value:S.avgNow>20?"—":`${S.avgNow.toFixed(1)}h/d`,sub:S.status==="done"?"Done!":"to finish on time",color:S.avgNow>S.avgOrig*1.5?"#E63946":S.avgNow>S.avgOrig?"#F4A261":"#2A9D8F"},
+              {label:"Required Now",value:S.avgNow>20?"—":`${S.avgNow.toFixed(1)}h/d`,sub:S.status==="done"?"Done!":S.lagH>0?`behind by ${S.lagH.toFixed(1)}h`:"on track",color:S.avgNow>S.avgOrig*1.5?"#E63946":S.avgNow>S.avgOrig?"#F4A261":"#2A9D8F"},
             ].map(s=>(<div key={s.label} style={{background:T.bg3,borderRadius:8,padding:mob?"12px":"14px 16px"}}>
               <div style={{fontSize:10,color:T.tx3,textTransform:"uppercase",letterSpacing:"0.1em",fontWeight:600,marginBottom:4}}>{s.label}</div>
               <div style={{fontSize:mob?18:22,fontWeight:800,color:s.color}}>{s.value}</div>
@@ -568,8 +569,8 @@ function GoalsPage({sessions,goals,setGoals}){
             {S.status==="done"?("🏆 Congratulations! You've completed this goal!"):
             S.isExpired?(`⏰ Deadline passed. You logged ${S.totalH.toFixed(1)}h of ${goal.targetHours}h. Consider extending the deadline.`):
             S.status==="green"?(`At your current pace of ${S.avgActual.toFixed(1)}h/day, you're on track to hit ${goal.targetHours}h${S.avgActual>S.avgOrig?" ahead of schedule":""}. Keep it up!`):
-            S.status==="orange"?(`⚠️ You're slightly behind. You need ${S.avgNow.toFixed(1)}h/day for the remaining ${S.dRemain} days to hit your goal.`):
-            (`🚨 You need ${S.avgNow.toFixed(1)}h/day for the next ${S.dRemain} days to reach your target. That's ${(S.avgNow/S.avgOrig).toFixed(1)}x your original required pace.`)}
+            S.status==="orange"?(`⚠️ You're slightly behind. You need ${S.avgNow.toFixed(1)}h/day for the remaining ${S.dRemain} days to hit your goal. Total debt: ${S.lagH.toFixed(1)}h (today's remaining + previous lag).`):
+            (`🚨 You need ${S.avgNow.toFixed(1)}h/day for the next ${S.dRemain} days to reach your target. That's ${(S.avgNow/S.avgOrig).toFixed(1)}x your original required pace. Total debt: ${S.lagH.toFixed(1)}h.`)}
           </div>
         </div>
 
@@ -674,8 +675,11 @@ function AnalysisPage({sessions,setSessions}){
   const T=useT();const[selectedDate,setSelectedDate]=useState(todayStr());const[showR,setShowR]=useState(false);const[showA,setShowA]=useState(false);const rRef=useRef(null);const aRef=useRef(null);const[vm,setVm]=useState(()=>{const d=nowIST();return{year:d.getFullYear(),month:d.getMonth()};});const w=useWindowWidth();const mob=w<480;
   // Quick Log state for selected date
   const[qlTag,setQlTag]=useState("");const[qlMins,setQlMins]=useState("");
+  // Editable session tag state
+  const[editSessId,setEditSessId]=useState(null);const[editSessTag,setEditSessTag]=useState("");
   const addSession=useCallback(async(ns)=>{setSessions(p=>[...p,ns]);const sv=await insertSession(ns);if(sv){setSessions(p=>p.map(s=>s.ts===ns.ts&&s.tag===ns.tag?{id:sv.id,tag:sv.tag,duration:sv.duration,date:sv.date,ts:Number(sv.ts)}:s));}},[setSessions]);
   const logQuick=()=>{const mins=parseInt(qlMins);if(!qlTag.trim()||isNaN(mins)||mins<=0)return;addSession({id:Date.now(),tag:qlTag.trim(),duration:mins,date:selectedDate,ts:Date.now()});setQlTag("");setQlMins("");};
+  const renameSession=async(s,newTag)=>{if(!newTag.trim()||newTag.trim()===s.tag){setEditSessId(null);return;}await updateSessionTag(s.id,newTag.trim());setSessions(p=>p.map(x=>x.id===s.id?{...x,tag:newTag.trim()}:x));setEditSessId(null);};
 
   const ds=sessions.filter(s=>s.date===selectedDate);const tt={};ds.forEach(s=>{tt[s.tag]=(tt[s.tag]||0)+s.duration;});const tot=ds.reduce((a,s)=>a+s.duration,0);const sorted=Object.entries(tt).sort((a,b)=>b[1]-a[1]);const allTags=[...new Set(sessions.map(s=>s.tag))];
   const shiftDate=(dir)=>{const d=new Date(selectedDate+"T12:00:00");d.setDate(d.getDate()+dir);setSelectedDate(dateToStr(d));};
@@ -701,7 +705,17 @@ function AnalysisPage({sessions,setSessions}){
       </div>
       <div style={{textAlign:"center",marginBottom:24}}><div style={{fontSize:42,fontFamily:F,fontWeight:700,color:T.tx}}>{formatHM(tot)}</div><div style={{fontSize:11,fontFamily:F,textTransform:"uppercase",letterSpacing:"0.15em",color:T.tx3,marginTop:4,fontWeight:600}}>Total Upskilling {tot>=120&&"🔥"}</div></div>
       {sorted.length===0?(<div style={{textAlign:"center",color:T.tx4,fontFamily:F,fontSize:13,padding:"30px 0"}}>No sessions recorded</div>):(<TagBarChart sorted={sorted} allTags={allTags}/>)}
-      {ds.length>0&&(<div style={{marginTop:24}}><div style={{fontSize:10,fontFamily:F,textTransform:"uppercase",letterSpacing:"0.12em",color:T.tx4,marginBottom:8,fontWeight:600}}>Session Log</div>{ds.map(s=>(<div key={s.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"7px 0",borderBottom:`1px solid ${T.bd}`,fontFamily:F,fontSize:13}}><span style={{display:"flex",alignItems:"center",gap:8,minWidth:0}}><span style={{width:8,height:8,borderRadius:2,background:getTagColor(s.tag,allTags),display:"inline-block",flexShrink:0}}/><span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",color:T.tx}}>{s.tag}</span></span><span style={{display:"flex",alignItems:"center",gap:10,flexShrink:0}}><span style={{color:T.tx3}}>{formatHM(s.duration)}</span><button onClick={async()=>{await deleteSession(s.id);setSessions(p=>p.filter(x=>x.id!==s.id));}} style={{border:"none",background:"none",cursor:"pointer",color:T.tx4,fontSize:16,padding:"0 2px",lineHeight:1}} title="Delete">✕</button></span></div>))}</div>)}
+      {ds.length>0&&(<div style={{marginTop:24}}><div style={{fontSize:10,fontFamily:F,textTransform:"uppercase",letterSpacing:"0.12em",color:T.tx4,marginBottom:8,fontWeight:600}}>Session Log</div>{ds.map(s=>(<div key={s.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"7px 0",borderBottom:`1px solid ${T.bd}`,fontFamily:F,fontSize:13}}>
+        <span style={{display:"flex",alignItems:"center",gap:8,minWidth:0,flex:1}}>
+          <span style={{width:8,height:8,borderRadius:2,background:getTagColor(s.tag,allTags),display:"inline-block",flexShrink:0}}/>
+          {editSessId===s.id?(
+            <input autoFocus value={editSessTag} onChange={e=>setEditSessTag(e.target.value)} onBlur={()=>renameSession(s,editSessTag)} onKeyDown={e=>{if(e.key==="Enter")renameSession(s,editSessTag);if(e.key==="Escape")setEditSessId(null);}} style={{border:"none",borderBottom:`2px solid ${T.bd3}`,background:"transparent",fontSize:13,fontFamily:F,fontWeight:600,outline:"none",color:T.tx,padding:"2px 0",flex:1,marginRight:8}}/>
+          ):(
+            <span onClick={()=>{setEditSessId(s.id);setEditSessTag(s.tag);}} style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",color:T.tx,cursor:"pointer"}} title="Click to rename">{s.tag}</span>
+          )}
+        </span>
+        <span style={{display:"flex",alignItems:"center",gap:10,flexShrink:0}}><span style={{color:T.tx3}}>{formatHM(s.duration)}</span><button onClick={async()=>{await deleteSession(s.id);setSessions(p=>p.filter(x=>x.id!==s.id));}} style={{border:"none",background:"none",cursor:"pointer",color:T.tx4,fontSize:16,padding:"0 2px",lineHeight:1}} title="Delete">✕</button></span>
+      </div>))}</div>)}
       {/* ── Quick Log for selected date ── */}
       <div style={{marginTop:28,marginBottom:8}}>
         <div style={{fontSize:11,fontFamily:F,textTransform:"uppercase",letterSpacing:"0.15em",color:T.tx3,marginBottom:12,fontWeight:600}}>Quick Log — {dateLabel}</div>
