@@ -424,6 +424,7 @@ function GoalsPage({sessions,goals,setGoals}){
   const[showAdd,setShowAdd]=useState(false);
   const[nName,setNName]=useState("");const[nTag,setNTag]=useState("");const[nHrs,setNHrs]=useState("");const[nStartDate,setNStartDate]=useState(todayStr());const[nDate,setNDate]=useState("");
   const[catchDays,setCatchDays]=useState("");const[catchResult,setCatchResult]=useState(null);
+  const[weekendHrs,setWeekendHrs]=useState("");const[weekendResult,setWeekendResult]=useState(null);
   useEffect(()=>{if(selId)localStorage.setItem("fm_selectedGoal",selId);},[selId]);
   useEffect(()=>{if(goals.length>0&&!goals.find(g=>g.id===selId)){setSelId(goals[0].id);}},[goals]);
   const allTags=[...new Set(sessions.map(s=>s.tag))].sort();
@@ -503,7 +504,7 @@ function GoalsPage({sessions,goals,setGoals}){
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20,gap:10,flexWrap:"wrap"}}>
         <div style={{fontSize:11,textTransform:"uppercase",letterSpacing:"0.15em",color:T.tx3,fontWeight:600}}>🎯 Goals</div>
         <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
-          {goals.length>0&&(<select value={selId} onChange={e=>{setSelId(e.target.value);setCatchDays("");setCatchResult(null);}} style={{...selStyle,maxWidth:mob?180:260}}>{goals.map(g=>(<option key={g.id} value={g.id}>{g.name}</option>))}</select>)}
+          {goals.length>0&&(<select value={selId} onChange={e=>{setSelId(e.target.value);setCatchDays("");setCatchResult(null);setWeekendHrs("");setWeekendResult(null);}} style={{...selStyle,maxWidth:mob?180:260}}>{goals.map(g=>(<option key={g.id} value={g.id}>{g.name}</option>))}</select>)}
           <button onClick={()=>setShowAdd(!showAdd)} style={{padding:"10px 18px",border:`2px solid ${T.bd3}`,background:showAdd?"transparent":T.btn,color:showAdd?T.tx:T.btnT,fontSize:12,fontFamily:F,fontWeight:700,cursor:"pointer"}}>{showAdd?"✕":"+ New"}</button>
         </div>
       </div>
@@ -638,6 +639,22 @@ function GoalsPage({sessions,goals,setGoals}){
               After {catchResult.days} days, resume normal pace of {S.avgOrig.toFixed(1)}h/day to finish on time.
             </div>
           </div>)}
+          {/* Weekend-adjusted plan */}
+          <div style={{borderTop:`1px solid ${T.bd}`,marginTop:16,paddingTop:16}}>
+            <div style={{fontSize:11,textTransform:"uppercase",letterSpacing:"0.12em",color:T.tx3,fontWeight:600,marginBottom:12}}>🗓 Weekend-adjusted plan</div>
+            <div style={{fontSize:13,color:T.tx2,marginBottom:12}}>How many hours can you do per weekend day?</div>
+            <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",marginBottom:weekendResult?14:0}}>
+              <input value={weekendHrs} onChange={e=>{setWeekendHrs(e.target.value);setWeekendResult(null);}} placeholder="e.g. 6" type="number" style={{border:`2px solid ${T.bd3}`,padding:"10px 14px",fontSize:14,fontFamily:F,background:"transparent",outline:"none",boxSizing:"border-box",color:T.tx,width:100}}/>
+              <span style={{fontSize:12,color:T.tx3,fontWeight:600}}>h/day (Sat & Sun)</span>
+              <button onClick={()=>{const wh=parseFloat(weekendHrs);if(isNaN(wh)||wh<0)return;const weeklyNeed=S.avgNow*7;const weekendPerWeek=wh*2;const weekdayNeed=Math.max(0,weeklyNeed-weekendPerWeek);const weekdayDaily=weekdayNeed/5;setWeekendResult({weekendPerDay:wh,weekdayDaily,weeklyNeed,weekendTotal:weekendPerWeek,weekdayTotal:weekdayNeed});}} style={{padding:"10px 20px",border:`2px solid ${T.bd3}`,background:T.btn,color:T.btnT,fontSize:12,fontFamily:F,fontWeight:700,cursor:"pointer",letterSpacing:"0.06em",textTransform:"uppercase"}}>Calculate</button>
+            </div>
+            {weekendResult&&(<div style={{background:"#457B9D15",borderRadius:8,padding:"14px 16px",borderLeft:"4px solid #457B9D"}}>
+              <div style={{fontSize:13,fontWeight:700,color:T.tx,marginBottom:8}}>Weekdays: <span style={{color:"#2A9D8F"}}>{weekendResult.weekdayDaily.toFixed(1)}h/day</span> (Mon–Fri) + Weekends: <span style={{color:"#457B9D"}}>{weekendResult.weekendPerDay.toFixed(1)}h/day</span> (Sat–Sun)</div>
+              <div style={{fontSize:12,color:T.tx2,lineHeight:1.7}}>
+                Weekday: {weekendResult.weekdayDaily.toFixed(1)} × 5 = {weekendResult.weekdayTotal.toFixed(1)}h + Weekend: {weekendResult.weekendPerDay.toFixed(1)} × 2 = {weekendResult.weekendTotal.toFixed(1)}h = <strong>{weekendResult.weeklyNeed.toFixed(1)}h/week</strong>
+              </div>
+            </div>)}
+          </div>
         </div>)}
 
         {/* Hours Progress Bar */}
