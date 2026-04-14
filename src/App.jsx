@@ -484,7 +484,14 @@ function GoalsPage({sessions,goals,setGoals}){
     const _todayIdx=wDays.findIndex(d=>d===todayStr());
     const _remainAfterToday=Math.max(1,_todayIdx>=0?7-_todayIdx-1:7);
     const todayForComfort=Math.max(0,_wRemainMins-(comfortPaceMins*_remainAfterToday));
-    S={totalH,hRemain,dTotal,dElapsed,dRemain,avgOrig,avgNow,avgActual,ratio,status,sColor,sLabel,sEmoji,progress,isExpired,wDays,dLabels,wData,wTotal,tagDT,l7Avg,expected,lagH,leadH,comfortPace,comfortPaceMins,todayForComfort,_remainAfterToday};
+    // Weekend catch-up: project weekday output at current pace, leftover goes to Sat+Sun
+    const avgActualMins=Math.round(avgActual*60);
+    const remWeekdays=_todayIdx<=4?Math.max(0,4-_todayIdx):0;
+    const projectedWeekdayTotal=wTotal+(remWeekdays*avgActualMins);
+    const weekendNeeded=Math.max(0,_weeklyNeedMins-projectedWeekdayTotal);
+    const weekendDaysLeft=_todayIdx<=4?2:_todayIdx===5?2:1;
+    const perWeekendDay=weekendDaysLeft>0?Math.round(weekendNeeded/weekendDaysLeft):0;
+    S={totalH,hRemain,dTotal,dElapsed,dRemain,avgOrig,avgNow,avgActual,ratio,status,sColor,sLabel,sEmoji,progress,isExpired,wDays,dLabels,wData,wTotal,tagDT,l7Avg,expected,lagH,leadH,comfortPace,comfortPaceMins,todayForComfort,_remainAfterToday,weekendNeeded,perWeekendDay};
   }
 
   const iStyle={border:`2px solid ${T.bd3}`,padding:"10px 14px",fontSize:14,fontFamily:F,background:"transparent",outline:"none",boxSizing:"border-box",color:T.tx};
@@ -584,8 +591,8 @@ function GoalsPage({sessions,goals,setGoals}){
             {S.status==="done"?("🏆 Congratulations! You've completed this goal!"):
             S.isExpired?(`⏰ Deadline passed. You logged ${S.totalH.toFixed(1)}h of ${goal.targetHours}h. Consider extending the deadline.`):
             S.status==="green"?(`At your current pace of ${S.avgActual.toFixed(1)}h/day, you're on track to hit ${goal.targetHours}h${S.avgActual>S.avgOrig?" ahead of schedule":""}. Keep it up!`):
-            S.status==="orange"?(`⚠️ You're slightly behind. You need ${S.avgNow.toFixed(1)}h/day for the remaining ${S.dRemain} days to hit your goal. Total debt: ${S.lagH.toFixed(1)}h (today's remaining + previous lag).`):
-            (`🚨 You need ${S.avgNow.toFixed(1)}h/day for the next ${S.dRemain} days to reach your target. That's ${(S.avgNow/S.avgOrig).toFixed(1)}x your original required pace. Total debt: ${S.lagH.toFixed(1)}h.`)}
+            S.status==="orange"?(S.weekendNeeded>0?`📅 At this pace, you need ${formatHM(S.perWeekendDay)} each on Sat & Sun to cover the weekly gap.`:`⚠️ Slightly behind overall — debt: ${S.lagH.toFixed(1)}h. But weekdays can cover this week.`):
+            (S.weekendNeeded>0?`📅 At this pace, you need ${formatHM(S.perWeekendDay)} each on Sat & Sun to cover the weekly gap.`:`🚨 Behind by ${S.lagH.toFixed(1)}h. Push harder on weekdays to avoid weekend overload.`)}
           </div>
         </div>
 
