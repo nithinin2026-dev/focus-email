@@ -424,7 +424,7 @@ function GoalsPage({sessions,goals,setGoals}){
   const[showAdd,setShowAdd]=useState(false);
   const[nName,setNName]=useState("");const[nTag,setNTag]=useState("");const[nHrs,setNHrs]=useState("");const[nStartDate,setNStartDate]=useState(todayStr());const[nDate,setNDate]=useState("");
   const[catchDays,setCatchDays]=useState("");const[catchResult,setCatchResult]=useState(null);
-  const[weekendHrs,setWeekendHrs]=useState("");const[weekendResult,setWeekendResult]=useState(null);
+  const[projMins,setProjMins]=useState({});
   useEffect(()=>{if(selId)localStorage.setItem("fm_selectedGoal",selId);},[selId]);
   useEffect(()=>{if(goals.length>0&&!goals.find(g=>g.id===selId)){setSelId(goals[0].id);}},[goals]);
   const allTags=[...new Set(sessions.map(s=>s.tag))].sort();
@@ -485,14 +485,7 @@ function GoalsPage({sessions,goals,setGoals}){
     const _todayIdx=wDays.findIndex(d=>d===todayStr());
     const _remainAfterToday=Math.max(1,_todayIdx>=0?7-_todayIdx-1:7);
     const todayForComfort=Math.max(0,_wRemainMins-(comfortPaceMins*_remainAfterToday));
-    // Weekend catch-up: project weekday output at current pace, leftover goes to Sat+Sun
-    const avgActualMins=Math.round(avgActual*60);
-    const remWeekdays=_todayIdx<=4?Math.max(0,4-_todayIdx):0;
-    const projectedWeekdayTotal=wTotal+(remWeekdays*avgActualMins);
-    const weekendNeeded=Math.max(0,_weeklyNeedMins-projectedWeekdayTotal);
-    const weekendDaysLeft=_todayIdx<=4?2:_todayIdx===5?2:1;
-    const perWeekendDay=weekendDaysLeft>0?Math.round(weekendNeeded/weekendDaysLeft):0;
-    S={totalH,hRemain,dTotal,dElapsed,dRemain,avgOrig,avgNow,avgActual,ratio,status,sColor,sLabel,sEmoji,progress,isExpired,wDays,dLabels,wData,wTotal,tagDT,l7Avg,expected,lagH,leadH,comfortPace,comfortPaceMins,todayForComfort,_remainAfterToday,weekendNeeded,perWeekendDay};
+    S={totalH,hRemain,dTotal,dElapsed,dRemain,avgOrig,avgNow,avgActual,ratio,status,sColor,sLabel,sEmoji,progress,isExpired,wDays,dLabels,wData,wTotal,tagDT,l7Avg,expected,lagH,leadH,comfortPace,comfortPaceMins,todayForComfort,_remainAfterToday,_weeklyNeedMins};
   }
 
   const iStyle={border:`2px solid ${T.bd3}`,padding:"10px 14px",fontSize:14,fontFamily:F,background:"transparent",outline:"none",boxSizing:"border-box",color:T.tx};
@@ -504,7 +497,7 @@ function GoalsPage({sessions,goals,setGoals}){
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20,gap:10,flexWrap:"wrap"}}>
         <div style={{fontSize:11,textTransform:"uppercase",letterSpacing:"0.15em",color:T.tx3,fontWeight:600}}>🎯 Goals</div>
         <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
-          {goals.length>0&&(<select value={selId} onChange={e=>{setSelId(e.target.value);setCatchDays("");setCatchResult(null);setWeekendHrs("");setWeekendResult(null);}} style={{...selStyle,maxWidth:mob?180:260}}>{goals.map(g=>(<option key={g.id} value={g.id}>{g.name}</option>))}</select>)}
+          {goals.length>0&&(<select value={selId} onChange={e=>{setSelId(e.target.value);setCatchDays("");setCatchResult(null);setProjMins({});}} style={{...selStyle,maxWidth:mob?180:260}}>{goals.map(g=>(<option key={g.id} value={g.id}>{g.name}</option>))}</select>)}
           <button onClick={()=>setShowAdd(!showAdd)} style={{padding:"10px 18px",border:`2px solid ${T.bd3}`,background:showAdd?"transparent":T.btn,color:showAdd?T.tx:T.btnT,fontSize:12,fontFamily:F,fontWeight:700,cursor:"pointer"}}>{showAdd?"✕":"+ New"}</button>
         </div>
       </div>
@@ -592,8 +585,8 @@ function GoalsPage({sessions,goals,setGoals}){
             {S.status==="done"?("🏆 Congratulations! You've completed this goal!"):
             S.isExpired?(`⏰ Deadline passed. You logged ${S.totalH.toFixed(1)}h of ${goal.targetHours}h. Consider extending the deadline.`):
             S.status==="green"?(`At your current pace of ${S.avgActual.toFixed(1)}h/day, you're on track to hit ${goal.targetHours}h${S.avgActual>S.avgOrig?" ahead of schedule":""}. Keep it up!`):
-            S.status==="orange"?(S.weekendNeeded>0?`📅 At this pace, you need ${formatHM(S.perWeekendDay)} each on Sat & Sun to cover the weekly gap.`:`⚠️ Slightly behind overall — debt: ${S.lagH.toFixed(1)}h. But weekdays can cover this week.`):
-            (S.weekendNeeded>0?`📅 At this pace, you need ${formatHM(S.perWeekendDay)} each on Sat & Sun to cover the weekly gap.`:`🚨 Behind by ${S.lagH.toFixed(1)}h. Push harder on weekdays to avoid weekend overload.`)}
+            S.status==="orange"?(`⚠️ Slightly behind — total debt: ${S.lagH.toFixed(1)}h. You need ${S.avgNow.toFixed(1)}h/day for ${S.dRemain} days.`):
+            (`🚨 Behind by ${S.lagH.toFixed(1)}h. You need ${S.avgNow.toFixed(1)}h/day for ${S.dRemain} days — ${(S.avgNow/S.avgOrig).toFixed(1)}x your original pace.`)}
           </div>
         </div>
 
@@ -639,22 +632,6 @@ function GoalsPage({sessions,goals,setGoals}){
               After {catchResult.days} days, resume normal pace of {S.avgOrig.toFixed(1)}h/day to finish on time.
             </div>
           </div>)}
-          {/* Weekend-adjusted plan */}
-          <div style={{borderTop:`1px solid ${T.bd}`,marginTop:16,paddingTop:16}}>
-            <div style={{fontSize:11,textTransform:"uppercase",letterSpacing:"0.12em",color:T.tx3,fontWeight:600,marginBottom:12}}>🗓 Weekend-adjusted plan</div>
-            <div style={{fontSize:13,color:T.tx2,marginBottom:12}}>How many hours can you do per weekend day?</div>
-            <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",marginBottom:weekendResult?14:0}}>
-              <input value={weekendHrs} onChange={e=>{setWeekendHrs(e.target.value);setWeekendResult(null);}} placeholder="e.g. 6" type="number" style={{border:`2px solid ${T.bd3}`,padding:"10px 14px",fontSize:14,fontFamily:F,background:"transparent",outline:"none",boxSizing:"border-box",color:T.tx,width:100}}/>
-              <span style={{fontSize:12,color:T.tx3,fontWeight:600}}>h/day (Sat & Sun)</span>
-              <button onClick={()=>{const wh=parseFloat(weekendHrs);if(isNaN(wh)||wh<0)return;const ti=S.wDays.findIndex(d=>d===todayStr());const rwd=ti<=4?Math.max(0,4-ti):0;const rwe=ti<5?2:ti===5?1:0;const wRem=Math.max(0,S.avgNow*60*7-S.wTotal);const weCont=wh*60*rwe;const wdNeed=Math.max(0,wRem-weCont);const wdDaily=rwd>0?wdNeed/rwd/60:0;setWeekendResult({weekendPerDay:wh,weekdayDaily:wdDaily,weeklyRemain:wRem/60,weekendTotal:weCont/60,weekdayTotal:wdNeed/60,remWeekdays:rwd,remWeekend:rwe});}} style={{padding:"10px 20px",border:`2px solid ${T.bd3}`,background:T.btn,color:T.btnT,fontSize:12,fontFamily:F,fontWeight:700,cursor:"pointer",letterSpacing:"0.06em",textTransform:"uppercase"}}>Calculate</button>
-            </div>
-            {weekendResult&&(<div style={{background:"#457B9D15",borderRadius:8,padding:"14px 16px",borderLeft:"4px solid #457B9D"}}>
-              <div style={{fontSize:13,fontWeight:700,color:T.tx,marginBottom:8}}>{weekendResult.remWeekdays>0?<>Weekdays: <span style={{color:"#2A9D8F"}}>{weekendResult.weekdayDaily.toFixed(1)}h/day</span> ({weekendResult.remWeekdays}d left)</>:"No weekdays left"} + Weekends: <span style={{color:"#457B9D"}}>{weekendResult.weekendPerDay.toFixed(1)}h/day</span> ({weekendResult.remWeekend}d)</div>
-              <div style={{fontSize:12,color:T.tx2,lineHeight:1.7}}>
-                {weekendResult.remWeekdays>0&&<>Weekday: {weekendResult.weekdayDaily.toFixed(1)} × {weekendResult.remWeekdays} = {weekendResult.weekdayTotal.toFixed(1)}h + </>}Weekend: {weekendResult.weekendPerDay.toFixed(1)} × {weekendResult.remWeekend} = {weekendResult.weekendTotal.toFixed(1)}h = <strong>{formatHM(Math.round(weekendResult.weeklyRemain))} remaining</strong>
-              </div>
-            </div>)}
-          </div>
         </div>)}
 
         {/* Hours Progress Bar */}
@@ -673,42 +650,58 @@ function GoalsPage({sessions,goals,setGoals}){
         {/* This Week Bar */}
         {(()=>{
           const weeklyNeedMins=Math.round(S.avgNow*60*7);
-          const wRemainMins=Math.max(0,weeklyNeedMins-S.wTotal);
           const todayIdx=S.wDays.findIndex(d=>d===todayStr());
+          const projTotal=S.wDays.reduce((a,d)=>a+(projMins[d]||0),0);
+          const simTotal=S.wTotal+projTotal;
+          const wRemainMins=Math.max(0,weeklyNeedMins-simTotal);
           const remainDays=Math.max(1,todayIdx>=0?7-todayIdx-1:7);
-          const dynamicDaily=Math.round(wRemainMins/remainDays);
-          const scaleMax=Math.max(dynamicDaily*1.5,Math.max(...S.wData.map(x=>x.mins)),1);
+          const dynamicDaily=remainDays>0?Math.round(wRemainMins/remainDays):0;
+          const allMins=S.wData.map(d=>d.mins+(projMins[d.date]||0));
+          const scaleMax=Math.max(dynamicDaily*1.5,Math.max(...allMins),1);
           return(<>
         <div style={{fontSize:11,textTransform:"uppercase",letterSpacing:"0.15em",color:T.tx3,fontWeight:600,marginBottom:14}}>This Week — {goal.tag}</div>
         <div style={{position:"relative"}}>
           <div style={{display:"flex",alignItems:"flex-end",gap:mob?6:10,height:140,paddingTop:16,marginBottom:8}}>
             {S.wData.map((d,i)=>{
-              const isFut=d.date>todayStr();const isT=d.date===todayStr();const isPast=d.date<todayStr();
-              const h=d.mins>0?Math.max((d.mins/scaleMax)*100,8):isFut?0:4;
+              const isFut=d.date>todayStr();const isT=d.date===todayStr();
+              const proj=projMins[d.date]||0;
+              const actualH=d.mins>0?Math.max((d.mins/scaleMax)*100,8):isFut?0:4;
+              const projH=proj>0?Math.max((proj/scaleMax)*100,4):0;
+              const totalMins=d.mins+proj;
               let bColor;
-              if(isFut)bColor=T.bd;
-              else if(d.mins>=dynamicDaily)bColor="#2A9D8F";
-              else if(d.mins>=dynamicDaily*0.8)bColor="#F4A261";
-              else bColor=d.mins>0?"#E63946":T.bd2;
+              if(isFut&&!proj)bColor=T.bd;
+              else if(totalMins>=dynamicDaily)bColor="#2A9D8F";
+              else if(totalMins>=dynamicDaily*0.8)bColor="#F4A261";
+              else bColor=totalMins>0?"#E63946":T.bd2;
               return(<div key={d.date} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"flex-end",height:140,maxWidth:60}}>
-                {d.mins>0&&!isFut&&<span style={{fontSize:9,fontWeight:700,color:bColor,marginBottom:2}}>{formatHM(d.mins)}</span>}
-                <div style={{width:"65%",height:h,background:bColor,borderRadius:"3px 3px 0 0",minHeight:d.mins>0?6:isFut?0:2,transition:"height 0.3s ease"}}/>
+                {totalMins>0&&<span style={{fontSize:9,fontWeight:700,color:bColor,marginBottom:2}}>{formatHM(totalMins)}</span>}
+                {proj>0&&<div style={{width:"65%",height:projH,background:bColor,borderRadius:"3px 3px 0 0",opacity:0.4,minHeight:4}}/>}
+                <div style={{width:"65%",height:actualH,background:isFut&&!d.mins?T.bd:bColor,borderRadius:proj>0?"0":"3px 3px 0 0",minHeight:d.mins>0?6:isFut?0:2,transition:"height 0.3s ease"}}/>
                 <span style={{fontSize:10,fontWeight:600,color:isT?T.tx:T.tx3,marginTop:4}}>{S.dLabels[i]}</span>
               </div>);})}
           </div>
-          {/* Dynamic daily target dashed line */}
           {dynamicDaily>0&&(()=>{const linePos=Math.min((dynamicDaily/scaleMax)*100,100);return linePos>0&&linePos<=100?(<div style={{position:"absolute",left:0,right:0,bottom:`${8+28+linePos*0.92}px`,borderTop:"2px dashed #E63946",opacity:0.5,pointerEvents:"none"}}><span style={{position:"absolute",right:0,top:-14,fontSize:8,color:"#E63946",fontWeight:700,fontFamily:F}}>{formatHM(dynamicDaily)}/day to hit weekly</span></div>):null;})()}
+        </div>
+        {/* Projection inputs */}
+        <div style={{display:"flex",gap:mob?6:10,marginBottom:12}}>
+          {S.wData.map((d,i)=>{
+            const isEditable=d.date>=todayStr();
+            return(<div key={d.date} style={{flex:1,maxWidth:60,display:"flex",justifyContent:"center"}}>
+              {isEditable?(<input value={projMins[d.date]?String(Math.round(projMins[d.date]/60*10)/10):""} onChange={e=>{const v=parseFloat(e.target.value);setProjMins(p=>({...p,[d.date]:isNaN(v)||v<=0?0:Math.round(v*60)}));}} placeholder="h" type="number" step="0.5" style={{width:"100%",maxWidth:48,border:`1px solid ${T.bd2}`,borderRadius:4,padding:"4px 2px",fontSize:10,fontFamily:F,fontWeight:600,textAlign:"center",background:T.bg3,color:T.tx,outline:"none",boxSizing:"border-box"}}/>):(<span style={{fontSize:9,color:T.tx4}}>—</span>)}
+            </div>);
+          })}
         </div>
         <div style={{display:"flex",gap:12,fontSize:10,color:T.tx3,marginBottom:8,flexWrap:"wrap"}}>
           <span style={{display:"flex",alignItems:"center",gap:4}}><span style={{width:8,height:8,background:"#2A9D8F",borderRadius:2,display:"inline-block"}}/> On target</span>
           <span style={{display:"flex",alignItems:"center",gap:4}}><span style={{width:8,height:8,background:"#F4A261",borderRadius:2,display:"inline-block"}}/> Within 20%</span>
           <span style={{display:"flex",alignItems:"center",gap:4}}><span style={{width:8,height:8,background:"#E63946",borderRadius:2,display:"inline-block"}}/> Behind</span>
+          {projTotal>0&&<span style={{display:"flex",alignItems:"center",gap:4}}><span style={{width:8,height:8,background:T.tx3,borderRadius:2,display:"inline-block",opacity:0.4}}/> Projected</span>}
           <span style={{display:"flex",alignItems:"center",gap:4}}><span style={{width:12,height:0,borderTop:"2px dashed #E63946",display:"inline-block"}}/> {formatHM(dynamicDaily)}/day ({remainDays}d left)</span>
         </div>
         <div style={{background:T.bg3,borderRadius:8,padding:"12px 16px",marginBottom:24}}>
-          <span style={{fontSize:12,fontWeight:600,color:T.tx}}>Week total: {formatHM(S.wTotal)}</span>
+          <span style={{fontSize:12,fontWeight:600,color:T.tx}}>Week total: {formatHM(S.wTotal)}{projTotal>0&&<span style={{color:"#457B9D"}}> + {formatHM(projTotal)} planned = {formatHM(simTotal)}</span>}</span>
           <span style={{fontSize:12,color:T.tx3,marginLeft:8}}>· Need {formatHM(weeklyNeedMins)}/week</span>
-          {S.wTotal>=weeklyNeedMins?<span style={{marginLeft:8}}>🔥</span>:<span style={{marginLeft:8,color:"#E63946",fontSize:11,fontWeight:600}}> — {formatHM(wRemainMins)} left in {remainDays}d</span>}
+          {simTotal>=weeklyNeedMins?<span style={{marginLeft:8}}>🔥</span>:<span style={{marginLeft:8,color:"#E63946",fontSize:11,fontWeight:600}}> — {formatHM(wRemainMins)} left in {remainDays}d</span>}
         </div>
           </>);})()}
 
