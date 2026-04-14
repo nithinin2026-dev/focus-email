@@ -474,7 +474,17 @@ function GoalsPage({sessions,goals,setGoals}){
     // Last 7 active days for trend
     const last7=wData.filter(d=>d.date<=todayStr());
     const l7Avg=last7.length>0?last7.reduce((a,d)=>a+d.mins,0)/last7.length/60:0;
-    S={totalH,hRemain,dTotal,dElapsed,dRemain,avgOrig,avgNow,avgActual,ratio,status,sColor,sLabel,sEmoji,progress,isExpired,wDays,dLabels,wData,wTotal,tagDT,l7Avg,expected,lagH,leadH};
+    // Comfort pace = avg hours on days you actually studied
+    const activeDays=new Set(ts.map(s=>s.date)).size;
+    const comfortPace=activeDays>0?totalH/activeDays:avgOrig;
+    const comfortPaceMins=Math.round(comfortPace*60);
+    // Comfort recommendation: how much to do today so rest of week = comfort pace
+    const _weeklyNeedMins=Math.round(avgNow*60*7);
+    const _wRemainMins=Math.max(0,_weeklyNeedMins-wTotal);
+    const _todayIdx=wDays.findIndex(d=>d===todayStr());
+    const _remainAfterToday=Math.max(1,_todayIdx>=0?7-_todayIdx-1:7);
+    const todayForComfort=Math.max(0,_wRemainMins-(comfortPaceMins*_remainAfterToday));
+    S={totalH,hRemain,dTotal,dElapsed,dRemain,avgOrig,avgNow,avgActual,ratio,status,sColor,sLabel,sEmoji,progress,isExpired,wDays,dLabels,wData,wTotal,tagDT,l7Avg,expected,lagH,leadH,comfortPace,comfortPaceMins,todayForComfort,_remainAfterToday};
   }
 
   const iStyle={border:`2px solid ${T.bd3}`,padding:"10px 14px",fontSize:14,fontFamily:F,background:"transparent",outline:"none",boxSizing:"border-box",color:T.tx};
@@ -579,6 +589,15 @@ function GoalsPage({sessions,goals,setGoals}){
           </div>
         </div>
 
+        {/* Comfort Pace Recommendation */}
+        {(S.status==="orange"||S.status==="red")&&!S.isExpired&&S.todayForComfort>0&&(
+          <div style={{background:"#6A4C9318",borderRadius:8,padding:"14px 18px",marginBottom:24,borderLeft:"4px solid #6A4C93"}}>
+            <div style={{fontSize:13,fontWeight:600,color:T.tx,lineHeight:1.6}}>
+              💡 Do <strong style={{color:"#6A4C93"}}>{formatHM(S.todayForComfort)}</strong> today → rest of the week at your comfort pace of <strong style={{color:"#2A9D8F"}}>{formatHM(S.comfortPaceMins)}/day</strong> ({S._remainAfterToday}d).
+            </div>
+          </div>
+        )}
+
         {/* Catch-up Plan */}
         {S.lagH>0&&(S.status==="orange"||S.status==="red")&&!S.isExpired&&(<div style={{background:T.bg2,border:`1px solid ${T.bd}`,borderRadius:10,padding:mob?16:20,marginBottom:24}}>
           <div style={{fontSize:11,textTransform:"uppercase",letterSpacing:"0.12em",color:T.tx3,fontWeight:600,marginBottom:14,display:"flex",alignItems:"center",gap:6}}>⚡ Catch-up Plan</div>
@@ -615,7 +634,6 @@ function GoalsPage({sessions,goals,setGoals}){
           const weeklyNeedMins=Math.round(S.avgNow*60*7);
           const wRemainMins=Math.max(0,weeklyNeedMins-S.wTotal);
           const todayIdx=S.wDays.findIndex(d=>d===todayStr());
-          // const remainDays=Math.max(1,todayIdx>=0?7-todayIdx:7);
           const remainDays=Math.max(1,todayIdx>=0?7-todayIdx-1:7);
           const dynamicDaily=Math.round(wRemainMins/remainDays);
           const scaleMax=Math.max(dynamicDaily*1.5,Math.max(...S.wData.map(x=>x.mins)),1);
