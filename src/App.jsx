@@ -265,6 +265,8 @@ function HabitsPage({habits,setHabits,habitLogs,setHabitLogs}){
   const T=useT();const w=useWindowWidth();const mob=w<480;
   const[showAdd,setShowAdd]=useState(false);
   const[nName,setNName]=useState("");const[nIcon,setNIcon]=useState("🎯");const[nDays,setNDays]=useState("");const[nStart,setNStart]=useState(todayStr());
+  const[calHabit,setCalHabit]=useState("__all__");
+  const[calMonth,setCalMonth]=useState(()=>{const d=nowIST();return{y:d.getFullYear(),m:d.getMonth()};});
 
   const addHabit=async()=>{
     const days=parseInt(nDays);
@@ -322,8 +324,52 @@ function HabitsPage({habits,setHabits,habitLogs,setHabitLogs}){
     return{dayNum,totalDone:logs.length,streak,best,doneToday,logDates};
   };
 
-  const renderHeatmap=(habit,logDates)=>{
-    const now=nowIST();const y=now.getFullYear();const m=now.getMonth();
+  // Build date→Set(habitId) map for "all habits" calendar
+  const dateHabitMap={};
+  habitLogs.forEach(l=>{if(!dateHabitMap[l.date])dateHabitMap[l.date]=new Set();dateHabitMap[l.date].add(l.habit_id);});
+
+  // For "all habits" mode: determine which habits were active on a given date (i.e. started ≤ date)
+  const habitsActiveOn=(dateStr)=>habits.filter(h=>h.start_date<=dateStr);
+
+  // "All habits" stats — streak = consecutive days where every active habit was done
+  const getAllHabitsStats=()=>{
+    if(habits.length===0)return{streak:0,best:0,doneToday:false,completedDates:new Set()};
+    const completed=new Set();
+    const allDates=[...new Set(habitLogs.map(l=>l.date))].sort();
+    allDates.forEach(d=>{
+      const active=habitsActiveOn(d);
+      if(active.length===0)return;
+      const doneIds=dateHabitMap[d]||new Set();
+      if(active.every(h=>doneIds.has(h.id)))completed.add(d);
+    });
+    const today=todayStr();const doneToday=completed.has(today);
+    let streak=0;
+    const d=new Date(today+"T12:00:00");
+    if(doneToday){streak=1;d.setDate(d.getDate()-1);}
+    else{d.setDate(d.getDate()-1);}
+    const earliestStart=habits.reduce((a,h)=>h.start_date<a?h.start_date:a,habits[0].start_date);
+    const earliestD=new Date(earliestStart+"T12:00:00");
+    while(d>=earliestD){
+      if(completed.has(dateToStr(d))){streak++;d.setDate(d.getDate()-1);}
+      else break;
+    }
+    // best streak
+    let best=0,cur=0;const sortedC=[...completed].sort();
+    for(let i=0;i<sortedC.length;i++){
+      if(i===0)cur=1;
+      else{
+        const prev=new Date(sortedC[i-1]+"T12:00:00");
+        const curD=new Date(sortedC[i]+"T12:00:00");
+        if((curD-prev)===86400000)cur++;
+        else cur=1;
+      }
+      if(cur>best)best=cur;
+    }
+    return{streak,best,doneToday,completedDates:completed};
+  };
+
+  const renderCalendar=()=>{
+    const{y,m}=calMonth;
     const dim=new Date(y,m+1,0).getDate();
     const firstDow=(new Date(y,m,1).getDay()+6)%7;
     const cells=[];
@@ -331,27 +377,41 @@ function HabitsPage({habits,setHabits,habitLogs,setHabitLogs}){
     for(let d=1;d<=dim;d++)cells.push(d);
     while(cells.length%7!==0)cells.push(null);
     const tk=todayStr();
-    const start=habit.start_date;
+    const isAll=calHabit==="__all__";
+    const habit=isAll?null:habits.find(h=>h.id===calHabit);
+    const allStats=isAll?getAllHabitsStats():null;
+    const start=isAll?(habits.length>0?habits.reduce((a,h)=>h.start_date<a?h.start_date:a,habits[0].start_date):tk):habit.start_date;
+    const logDates=isAll?allStats.completedDates:new Set(habitLogs.filter(l=>l.habit_id===habit.id).map(l=>l.date));
+    const cellSize=mob?28:32;
     return(
       <div>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(7, 1fr)",gap:4,marginBottom:4}}>
-          {["M","T","W","T","F","S","S"].map((d,i)=>(<div key={i} style={{textAlign:"center",fontSize:9,fontWeight:700,color:T.tx3,letterSpacing:"0.05em"}}>{d}</div>))}
+        <div style={{display:"grid",gridTemplateColumns:"repeat(7, 1fr)",gap:3,marginBottom:3,maxWidth:cellSize*7+18,margin:"0 auto 3px"}}>
+          {["M","T","W","T","F","S","S"].map((d,i)=>(<div key={i} style={{textAlign:"center",fontSize:9,fontWeight:700,color:T.tx3,height:18,lineHeight:"18px"}}>{d}</div>))}
         </div>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(7, 1fr)",gap:4}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(7, 1fr)",gap:3,maxWidth:cellSize*7+18,margin:"0 auto"}}>
           {cells.map((day,i)=>{
-            if(day===null)return<div key={`e${i}`} style={{aspectRatio:"1"}}/>;
+            if(day===null)return<div key={`e${i}`} style={{width:cellSize,height:cellSize}}/>;
             const k=`${y}-${String(m+1).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
             const done=logDates.has(k);
             const isFuture=k>tk;
             const beforeStart=k<start;
             const isToday=k===tk;
+            // For "all" mode: show yellow if SOME (not all) habits were done
+            let partial=false;
+            if(isAll&&!done&&!isFuture&&!beforeStart){
+              const active=habitsActiveOn(k);
+              const doneIds=dateHabitMap[k]||new Set();
+              const doneCount=active.filter(h=>doneIds.has(h.id)).length;
+              if(doneCount>0&&doneCount<active.length)partial=true;
+            }
             let bg=T.bg3,color=T.tx3;
             if(beforeStart){bg="transparent";color=T.tx4;}
             else if(done){bg="#2A9D8F";color="#fff";}
             else if(isFuture){bg=T.bg3;color=T.tx4;}
+            else if(partial){bg="#F4A261";color="#fff";}
             else{bg=T.rR;color="#E63946";}
             return(
-              <div key={i} style={{aspectRatio:"1",display:"flex",alignItems:"center",justifyContent:"center",fontSize:mob?11:12,fontWeight:isToday?800:600,background:bg,color,borderRadius:4,border:isToday?`2px solid ${T.bd3}`:"none"}}>{day}</div>
+              <div key={i} style={{width:cellSize,height:cellSize,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:isToday?800:600,background:bg,color,borderRadius:4,border:isToday?`2px solid ${T.bd3}`:"none",boxSizing:"border-box"}}>{day}</div>
             );
           })}
         </div>
@@ -359,8 +419,21 @@ function HabitsPage({habits,setHabits,habitLogs,setHabitLogs}){
     );
   };
 
+  const shiftMonth=(dir)=>{setCalMonth(p=>{let nm=p.m+dir,ny=p.y;if(nm<0){nm=11;ny--;}if(nm>11){nm=0;ny++;}return{y:ny,m:nm};});};
+  const monthLabel=new Date(calMonth.y,calMonth.m).toLocaleDateString("en-US",{month:"long",year:"numeric"});
   const iStyle={border:`2px solid ${T.bd3}`,padding:"10px 14px",fontSize:14,fontFamily:F,background:"transparent",outline:"none",boxSizing:"border-box",color:T.tx};
-  const monthLabel=nowIST().toLocaleDateString("en-US",{month:"long",year:"numeric"});
+
+  // Calendar stats (fire days + streak for selected view)
+  const calStats=(()=>{
+    if(calHabit==="__all__"){
+      const s=getAllHabitsStats();
+      return{fireDays:s.completedDates.size,streak:s.streak,best:s.best};
+    }
+    const h=habits.find(hh=>hh.id===calHabit);
+    if(!h)return{fireDays:0,streak:0,best:0};
+    const s=getHabitStats(h);
+    return{fireDays:s.totalDone,streak:s.streak,best:s.best};
+  })();
 
   return(
     <div style={{fontFamily:F}}>
@@ -402,48 +475,71 @@ function HabitsPage({habits,setHabits,habitLogs,setHabitLogs}){
         </div>
       )}
 
-      {habits.map(habit=>{
-        const s=getHabitStats(habit);
-        const progressPct=Math.min((s.totalDone/habit.target_days)*100,100);
-        return(
-          <div key={habit.id} style={{background:T.bg2,borderRadius:12,padding:mob?16:20,marginBottom:16,border:`1px solid ${T.bd}`}}>
-            <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14}}>
-              <div style={{width:48,height:48,borderRadius:10,background:T.bg3,display:"flex",alignItems:"center",justifyContent:"center",fontSize:26,flexShrink:0}}>{habit.icon}</div>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:mob?15:16,fontWeight:800,color:T.tx,marginBottom:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{habit.name}</div>
-                <div style={{fontSize:11,color:T.tx3,fontWeight:600}}>Day {s.dayNum} of {habit.target_days} · {s.totalDone} done</div>
+      {/* Habit rows */}
+      {habits.length>0&&(
+        <div style={{background:T.bg2,borderRadius:10,border:`1px solid ${T.bd}`,overflow:"hidden",marginBottom:24}}>
+          {habits.map((habit,idx)=>{
+            const s=getHabitStats(habit);
+            const progressPct=Math.round(Math.min((s.totalDone/habit.target_days)*100,100));
+            return(
+              <div key={habit.id} style={{display:"flex",alignItems:"center",gap:mob?8:12,padding:mob?"10px 12px":"12px 16px",borderBottom:idx<habits.length-1?`1px solid ${T.bd}`:"none"}}>
+                <div style={{fontSize:22,flexShrink:0,width:28,textAlign:"center"}}>{habit.icon}</div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:mob?13:14,fontWeight:700,color:T.tx,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{habit.name}</div>
+                  <div style={{fontSize:10,color:T.tx3,fontWeight:600,marginTop:1}}>Day {s.dayNum}/{habit.target_days} · best {s.best} · {progressPct}%</div>
+                </div>
+                <div style={{display:"flex",alignItems:"center",gap:2,flexShrink:0,minWidth:mob?38:44}}>
+                  <span style={{fontSize:mob?13:15}}>{s.streak>0?"🔥":""}</span>
+                  <span style={{fontSize:mob?14:16,fontWeight:800,color:s.streak>0?"#E63946":T.tx4}}>{s.streak}</span>
+                </div>
+                <button onClick={()=>toggleToday(habit.id)} style={{width:28,height:28,border:s.doneToday?"none":`2px solid ${T.bd2}`,background:s.doneToday?"#2A9D8F":"transparent",borderRadius:6,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:16,fontWeight:800,flexShrink:0,padding:0}} title={s.doneToday?"Uncheck today":"Mark today done"}>{s.doneToday&&"✓"}</button>
+                <button onClick={()=>delHabit(habit.id)} style={{border:"none",background:"none",cursor:"pointer",color:T.tx4,fontSize:14,padding:"0 2px",flexShrink:0}} title="Delete">✕</button>
               </div>
-              <button onClick={()=>delHabit(habit.id)} style={{border:"none",background:"none",cursor:"pointer",color:T.tx4,fontSize:18,padding:4,flexShrink:0}} title="Delete">✕</button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Calendar section */}
+      {habits.length>0&&(
+        <div style={{background:T.bg2,borderRadius:10,padding:mob?14:18,border:`1px solid ${T.bd}`}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,marginBottom:12,flexWrap:"wrap"}}>
+            <select value={calHabit} onChange={e=>setCalHabit(e.target.value)} style={{border:`2px solid ${T.bd3}`,padding:"6px 10px",fontSize:12,fontFamily:F,fontWeight:700,background:T.sel,color:T.tx,outline:"none",cursor:"pointer",borderRadius:4,maxWidth:mob?160:220}}>
+              <option value="__all__">🎯 All Habits</option>
+              {habits.map(h=>(<option key={h.id} value={h.id}>{h.icon} {h.name}</option>))}
+            </select>
+            <div style={{display:"flex",alignItems:"center",gap:8}}>
+              <button onClick={()=>shiftMonth(-1)} style={{border:"none",background:"none",fontSize:16,cursor:"pointer",color:T.tx}}>←</button>
+              <span style={{fontSize:12,fontWeight:700,color:T.tx,minWidth:90,textAlign:"center"}}>{monthLabel}</span>
+              <button onClick={()=>shiftMonth(1)} style={{border:"none",background:"none",fontSize:16,cursor:"pointer",color:T.tx}}>→</button>
             </div>
-
-            <div style={{height:6,background:T.bg3,borderRadius:3,overflow:"hidden",marginBottom:14}}>
-              <div style={{height:"100%",width:`${progressPct}%`,background:"#2A9D8F",transition:"width 0.4s ease"}}/>
-            </div>
-
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:16}}>
-              <div style={{textAlign:"center",padding:"8px",background:T.bg3,borderRadius:6}}>
-                <div style={{fontSize:20,fontWeight:800,color:s.streak>0?"#E63946":T.tx4}}>{s.streak>0?"🔥":""}{s.streak}</div>
-                <div style={{fontSize:9,color:T.tx3,textTransform:"uppercase",letterSpacing:"0.08em",fontWeight:600}}>Streak</div>
-              </div>
-              <div style={{textAlign:"center",padding:"8px",background:T.bg3,borderRadius:6}}>
-                <div style={{fontSize:20,fontWeight:800,color:T.tx}}>{s.best}</div>
-                <div style={{fontSize:9,color:T.tx3,textTransform:"uppercase",letterSpacing:"0.08em",fontWeight:600}}>Best</div>
-              </div>
-              <div style={{textAlign:"center",padding:"8px",background:T.bg3,borderRadius:6}}>
-                <div style={{fontSize:20,fontWeight:800,color:"#2A9D8F"}}>{Math.round(progressPct)}%</div>
-                <div style={{fontSize:9,color:T.tx3,textTransform:"uppercase",letterSpacing:"0.08em",fontWeight:600}}>Complete</div>
-              </div>
-            </div>
-
-            <button onClick={()=>toggleToday(habit.id)} style={{width:"100%",padding:"12px",border:`2px solid ${s.doneToday?"#2A9D8F":T.bd3}`,background:s.doneToday?"#2A9D8F":T.btn,color:s.doneToday?"#fff":T.btnT,fontSize:13,fontFamily:F,fontWeight:700,cursor:"pointer",letterSpacing:"0.06em",textTransform:"uppercase",borderRadius:8,marginBottom:16,transition:"all 0.2s ease"}}>
-              {s.doneToday?"✓ Done Today":"Mark Today Done"}
-            </button>
-
-            <div style={{fontSize:10,color:T.tx3,fontWeight:600,marginBottom:8,textTransform:"uppercase",letterSpacing:"0.1em"}}>{monthLabel}</div>
-            {renderHeatmap(habit,s.logDates)}
           </div>
-        );
-      })}
+
+          {/* Stats strip */}
+          <div style={{display:"flex",justifyContent:"space-around",padding:"8px 0 14px",borderBottom:`1px solid ${T.bd}`,marginBottom:12}}>
+            <div style={{textAlign:"center"}}>
+              <div style={{fontSize:16,fontWeight:800,color:calStats.streak>0?"#E63946":T.tx4}}>{calStats.streak>0?"🔥":""}{calStats.streak}</div>
+              <div style={{fontSize:9,color:T.tx3,textTransform:"uppercase",letterSpacing:"0.08em",fontWeight:600}}>Streak</div>
+            </div>
+            <div style={{textAlign:"center"}}>
+              <div style={{fontSize:16,fontWeight:800,color:T.tx}}>{calStats.best}</div>
+              <div style={{fontSize:9,color:T.tx3,textTransform:"uppercase",letterSpacing:"0.08em",fontWeight:600}}>Best</div>
+            </div>
+            <div style={{textAlign:"center"}}>
+              <div style={{fontSize:16,fontWeight:800,color:"#2A9D8F"}}>{calStats.fireDays}</div>
+              <div style={{fontSize:9,color:T.tx3,textTransform:"uppercase",letterSpacing:"0.08em",fontWeight:600}}>Fire Days</div>
+            </div>
+          </div>
+
+          {renderCalendar()}
+
+          <div style={{display:"flex",justifyContent:"center",gap:12,marginTop:12,fontSize:9,color:T.tx3,flexWrap:"wrap"}}>
+            <span style={{display:"flex",alignItems:"center",gap:4}}><span style={{width:8,height:8,background:"#2A9D8F",borderRadius:2}}/>Done{calHabit==="__all__"?" (all)":""}</span>
+            {calHabit==="__all__"&&<span style={{display:"flex",alignItems:"center",gap:4}}><span style={{width:8,height:8,background:"#F4A261",borderRadius:2}}/>Partial</span>}
+            <span style={{display:"flex",alignItems:"center",gap:4}}><span style={{width:8,height:8,background:T.rR,borderRadius:2}}/>Missed</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1115,4 +1211,3 @@ export default function App(){
     </ThemeContext.Provider>
   );
 }
-// new push retrying
