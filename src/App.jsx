@@ -551,7 +551,7 @@ function TimerPage({sessions,setSessions}){
   const[running,setRunning]=useState(()=>sessionStorage.getItem("sl_running")==="true");
   const[elapsed,setElapsed]=useState(()=>{const st=sessionStorage.getItem("sl_startTs");const wr=sessionStorage.getItem("sl_running")==="true";if(wr&&st)return Math.floor((Date.now()-Number(st))/1000);const sv=sessionStorage.getItem("sl_elapsed");return sv?Number(sv):0;});
   const[mode,setMode]=useState(()=>sessionStorage.getItem("sl_mode")||"focus");
-  const[focusMins,setFocusMins]=useState(()=>Number(sessionStorage.getItem("sl_focusMins"))||60);
+  const[focusMins,setFocusMins]=useState(()=>Number(sessionStorage.getItem("sl_focusMins"))||90);
   const[breakMins,setBreakMins]=useState(()=>Number(sessionStorage.getItem("sl_breakMins"))||5);
   const[editing,setEditing]=useState(false);const[tempFocus,setTempFocus]=useState("25");const[tempBreak,setTempBreak]=useState("5");
   const focusDur=focusMins*60;const breakDur=breakMins*60;const intervalRef=useRef(null);const startTimeRef=useRef(null);const loggedRef=useRef(false);
