@@ -42,7 +42,7 @@ function useWindowWidth() {
   return w;
 }
 
-const QUOTES = ["~650hrs at 90min rate * 210 days","You lost ~400hrs at simple 90min rate"];
+const QUOTES = ["~600hrs at 90min rate * 200 days","You lost ~400hrs at simple 90min rate"];
 
 let bellReady=false, bellSynth=null;
 function initBell(){if(bellReady)return;bellSynth=new Tone.PolySynth(Tone.Synth,{oscillator:{type:"sine"},envelope:{attack:0.005,decay:0.8,sustain:0.01,release:1.2},volume:-6}).toDestination();bellReady=true;}
