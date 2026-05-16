@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback, createContext, useContext } f
 import * as Tone from "tone";
 import { supabase } from "./supabaseClient";
 
-const PAGES = { HABITS: "habits", TIMER: "timer", TASKS: "tasks", GOALS: "goals", ANALYSIS: "analysis", CALENDAR: "calendar", REFLECTION: "reflection", SLEEP: "sleep" };
+const PAGES = { HABITS: "habits", TIMER: "timer", GOALS: "goals",REFLECTION: "reflection", SLEEP: "sleep" };
 
 // ═══════════════════════════════════════════
 // ─── THEME SYSTEM (persists in localStorage) ───
@@ -185,7 +185,7 @@ function WeekStrip({sessions}){
 // ═══════════════════════════════════════════
 function Sidebar({open,onClose,page,setPage,sessions,onLogout,isDark,onToggleTheme}){
   const T=useT();
-  const items=[{key:PAGES.HABITS,label:"Habits",icon:"🔥"},{key:PAGES.TIMER,label:"Timer",icon:"⏱"},{key:PAGES.TASKS,label:"Tasks",icon:"✅"},{key:PAGES.GOALS,label:"Goals",icon:"🎯"},{key:PAGES.ANALYSIS,label:"Analysis",icon:"📊"},{key:PAGES.CALENDAR,label:"Calendar",icon:"📅"},{key:PAGES.REFLECTION,label:"Reflect",icon:"💭"},{key:PAGES.SLEEP,label:"Sleep",icon:"🌙"}];
+  const items=[{key:PAGES.HABITS,label:"Habits",icon:"🔥"},{key:PAGES.TIMER,label:"Timer",icon:"⏱"},{key:PAGES.GOALS,label:"Goals",icon:"🎯"},{key:PAGES.REFLECTION,label:"Reflect",icon:"💭"},{key:PAGES.SLEEP,label:"Sleep",icon:"🌙"}];
   const now=nowIST();const ys=String(now.getFullYear());const mn=now.toLocaleDateString("en-US",{month:"short"});
   const yMins=sessions.filter(s=>s.date.startsWith(ys)).reduce((a,s)=>a+s.duration,0);
   const mp=`${ys}-${String(now.getMonth()+1).padStart(2,"0")}`;
@@ -498,51 +498,11 @@ function HabitsPage({habits,setHabits,habitLogs,setHabitLogs}){
             );
           })}
         </div>
-      )}
-
-      {/* Calendar section */}
-      {habits.length>0&&(
-        <div style={{background:T.bg2,borderRadius:10,padding:mob?14:18,border:`1px solid ${T.bd}`}}>
-          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,marginBottom:12,flexWrap:"wrap"}}>
-            <select value={calHabit} onChange={e=>setCalHabit(e.target.value)} style={{border:`2px solid ${T.bd3}`,padding:"6px 10px",fontSize:12,fontFamily:F,fontWeight:700,background:T.sel,color:T.tx,outline:"none",cursor:"pointer",borderRadius:4,maxWidth:mob?160:220}}>
-              <option value="__all__">🎯 All Habits</option>
-              {habits.map(h=>(<option key={h.id} value={h.id}>{h.icon} {h.name}</option>))}
-            </select>
-            <div style={{display:"flex",alignItems:"center",gap:8}}>
-              <button onClick={()=>shiftMonth(-1)} style={{border:"none",background:"none",fontSize:16,cursor:"pointer",color:T.tx}}>←</button>
-              <span style={{fontSize:12,fontWeight:700,color:T.tx,minWidth:90,textAlign:"center"}}>{monthLabel}</span>
-              <button onClick={()=>shiftMonth(1)} style={{border:"none",background:"none",fontSize:16,cursor:"pointer",color:T.tx}}>→</button>
-            </div>
-          </div>
-
-          {/* Stats strip */}
-          <div style={{display:"flex",justifyContent:"space-around",padding:"8px 0 14px",borderBottom:`1px solid ${T.bd}`,marginBottom:12}}>
-            <div style={{textAlign:"center"}}>
-              <div style={{fontSize:16,fontWeight:800,color:calStats.streak>0?"#E63946":T.tx4}}>{calStats.streak>0?"🔥":""}{calStats.streak}</div>
-              <div style={{fontSize:9,color:T.tx3,textTransform:"uppercase",letterSpacing:"0.08em",fontWeight:600}}>Streak</div>
-            </div>
-            <div style={{textAlign:"center"}}>
-              <div style={{fontSize:16,fontWeight:800,color:T.tx}}>{calStats.best}</div>
-              <div style={{fontSize:9,color:T.tx3,textTransform:"uppercase",letterSpacing:"0.08em",fontWeight:600}}>Best</div>
-            </div>
-            <div style={{textAlign:"center"}}>
-              <div style={{fontSize:16,fontWeight:800,color:"#2A9D8F"}}>{calStats.fireDays}</div>
-              <div style={{fontSize:9,color:T.tx3,textTransform:"uppercase",letterSpacing:"0.08em",fontWeight:600}}>Fire Days</div>
-            </div>
-          </div>
-
-          {renderCalendar()}
-
-          <div style={{display:"flex",justifyContent:"center",gap:12,marginTop:12,fontSize:9,color:T.tx3,flexWrap:"wrap"}}>
-            <span style={{display:"flex",alignItems:"center",gap:4}}><span style={{width:8,height:8,background:"#2A9D8F",borderRadius:2}}/>Done{calHabit==="__all__"?" (all)":""}</span>
-            {calHabit==="__all__"&&<span style={{display:"flex",alignItems:"center",gap:4}}><span style={{width:8,height:8,background:"#F4A261",borderRadius:2}}/>Partial</span>}
-            <span style={{display:"flex",alignItems:"center",gap:4}}><span style={{width:8,height:8,background:T.rR,borderRadius:2}}/>Missed</span>
-          </div>
-        </div>
-      )}
-    </div>
+      )}</div>
   );
 }
+
+
 
 // ─── Timer Page ───
 function TimerPage({sessions,setSessions}){
@@ -1178,17 +1138,17 @@ function SleepPage({sleepLogs,setSleepLogs}){
 // ─── MAIN APP ───
 // ═══════════════════════════════════════════
 export default function App(){
-  const[user,setUser]=useState(null);const[authLoading,setAuthLoading]=useState(true);const[page,setPage]=useState(PAGES.HABITS);const[sessions,setSessions]=useState([]);const[tasks,setTasks]=useState([]);const[sleepLogs,setSleepLogs]=useState([]);const[goals,setGoals]=useState([]);const[habits,setHabits]=useState([]);const[habitLogs,setHabitLogs]=useState([]);const[loaded,setLoaded]=useState(false);const[sidebarOpen,setSidebarOpen]=useState(false);
+  const[user,setUser]=useState(null);const[authLoading,setAuthLoading]=useState(true);const[page,setPage]=useState(PAGES.HABITS);const[sessions,setSessions]=useState([]);const[sleepLogs,setSleepLogs]=useState([]);const[goals,setGoals]=useState([]);const[habits,setHabits]=useState([]);const[habitLogs,setHabitLogs]=useState([]);const[loaded,setLoaded]=useState(false);const[sidebarOpen,setSidebarOpen]=useState(false);
   const[isDark,setIsDark]=useState(()=>localStorage.getItem("fm_theme")==="dark");
   const toggleTheme=()=>{setIsDark(p=>{const n=!p;localStorage.setItem("fm_theme",n?"dark":"light");return n;});};
   const theme=isDark?D:L;const w=useWindowWidth();
   useEffect(()=>{document.body.style.background=theme.bg;document.documentElement.style.background=theme.bg;document.body.style.margin="0";},[isDark]);
   if(typeof document!=="undefined"){document.body.style.background=(localStorage.getItem("fm_theme")==="dark"?"#000":"#fff");document.documentElement.style.background=(localStorage.getItem("fm_theme")==="dark"?"#000":"#fff");}
   useEffect(()=>{supabase.auth.getSession().then(({data:{session}})=>{setUser(session?.user??null);setAuthLoading(false);});const{data:{subscription}}=supabase.auth.onAuthStateChange((_e,session)=>{setUser(session?.user??null);});return()=>subscription.unsubscribe();},[]);
-  useEffect(()=>{if(!user){setSessions([]);setTasks([]);setSleepLogs([]);setGoals([]);setHabits([]);setHabitLogs([]);setLoaded(false);return;}setLoaded(false);Promise.all([loadSessions(),loadTasks(),loadSleepLogs(),loadGoals(),loadHabits(),loadHabitLogs()]).then(([s,t,sl,g,h,hl])=>{setSessions(s);setTasks(t);setSleepLogs(sl);setGoals(g);setHabits(h);setHabitLogs(hl);setLoaded(true);});},[user]);
-  const handleLogout=async()=>{await supabase.auth.signOut();setUser(null);setSessions([]);setTasks([]);setSleepLogs([]);setGoals([]);setHabits([]);setHabitLogs([]);setLoaded(false);setSidebarOpen(false);};
+  useEffect(()=>{if(!user){setSessions([]);setSleepLogs([]);setGoals([]);setHabits([]);setHabitLogs([]);setLoaded(false);return;}setLoaded(false);Promise.all([loadSessions(),loadSleepLogs(),loadGoals(),loadHabits(),loadHabitLogs()]).then(([s,sl,g,h,hl])=>{setSessions(s);setSleepLogs(sl);setGoals(g);setHabits(h);setHabitLogs(hl);setLoaded(true);});},[user]);
+  const handleLogout=async()=>{await supabase.auth.signOut();setUser(null);setSessions([]);setSleepLogs([]);setGoals([]);setHabits([]);setHabitLogs([]);setLoaded(false);setSidebarOpen(false);};
   const streak=calcStreak(sessions);const todayMins=sessions.filter(s=>s.date===todayStr()).reduce((a,s)=>a+s.duration,0);
-  const getMaxWidth=()=>{if(page===PAGES.CALENDAR)return w<480?"100%":900;if(page===PAGES.GOALS||page===PAGES.HABITS)return w<480?"100%":640;return w<480?"100%":540;};
+  const getMaxWidth=()=>{if(page===PAGES.GOALS||page===PAGES.HABITS)return w<480?"100%":640;return w<480?"100%":540;};
   const fontLink=<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>;
   if(authLoading)return(<ThemeContext.Provider value={theme}><div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100vh",fontFamily:F,fontSize:14,color:theme.tx3,background:theme.bg}}>{fontLink}Loading...</div></ThemeContext.Provider>);
   if(!user)return(<ThemeContext.Provider value={theme}>{fontLink}<AuthPage onAuth={setUser}/></ThemeContext.Provider>);
@@ -1201,10 +1161,7 @@ export default function App(){
         <Sidebar open={sidebarOpen} onClose={()=>setSidebarOpen(false)} page={page} setPage={setPage} sessions={sessions} onLogout={handleLogout} isDark={isDark} onToggleTheme={toggleTheme}/>
         {page===PAGES.HABITS&&<div style={{paddingTop:16}}><HabitsPage habits={habits} setHabits={setHabits} habitLogs={habitLogs} setHabitLogs={setHabitLogs}/></div>}
         {page===PAGES.TIMER&&<><WeekStrip sessions={sessions}/><TimerPage sessions={sessions} setSessions={setSessions}/></>}
-        {page===PAGES.TASKS&&<div style={{paddingTop:16}}><TasksPage tasks={tasks} setTasks={setTasks}/></div>}
-        {page===PAGES.GOALS&&<div style={{paddingTop:16}}><GoalsPage sessions={sessions} goals={goals} setGoals={setGoals}/></div>}
-        {page===PAGES.ANALYSIS&&<div style={{paddingTop:16}}><AnalysisPage sessions={sessions} setSessions={setSessions}/></div>}
-        {page===PAGES.CALENDAR&&<CalendarPage sessions={sessions}/>}
+       {page===PAGES.GOALS&&<div style={{paddingTop:16}}><GoalsPage sessions={sessions} goals={goals} setGoals={setGoals}/></div>}
         {page===PAGES.REFLECTION&&<div style={{paddingTop:16}}><ReflectionPage sessions={sessions}/></div>}
         {page===PAGES.SLEEP&&<div style={{paddingTop:16}}><SleepPage sleepLogs={sleepLogs} setSleepLogs={setSleepLogs}/></div>}
       </div>
