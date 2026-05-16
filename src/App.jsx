@@ -498,14 +498,41 @@ function HabitsPage({habits,setHabits,habitLogs,setHabitLogs}){
             );
           })}
         </div>
-      )}</div>
+        )}
+        {habits.length>0&&(
+        <div style={{background:T.bg2,borderRadius:10,padding:mob?14:20,border:`1px solid ${T.bd}`}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,flexWrap:"wrap",gap:8}}>
+            <select value={calHabit} onChange={e=>setCalHabit(e.target.value)} style={{border:`2px solid ${T.bd3}`,padding:"6px 10px",fontSize:12,fontFamily:F,fontWeight:700,background:T.sel,color:T.tx,outline:"none",cursor:"pointer",borderRadius:4,maxWidth:mob?160:240}}>
+              <option value="__all__">All Habits</option>
+              {habits.map(h=>(<option key={h.id} value={h.id}>{h.icon} {h.name}</option>))}
+            </select>
+            <div style={{display:"flex",alignItems:"center",gap:10}}>
+              <button onClick={()=>shiftMonth(-1)} style={{border:"none",background:"none",fontSize:16,cursor:"pointer",color:T.tx}}>←</button>
+              <span style={{fontSize:12,fontWeight:700,color:T.tx,minWidth:120,textAlign:"center"}}>{monthLabel}</span>
+              <button onClick={()=>shiftMonth(1)} style={{border:"none",background:"none",fontSize:16,cursor:"pointer",color:T.tx}}>→</button>
+            </div>
+          </div>
+          <div style={{display:"flex",gap:16,marginBottom:14,fontSize:11,fontWeight:700,flexWrap:"wrap"}}>
+            <span style={{color:"#2A9D8F"}}>🔥 {calStats.fireDays} days</span>
+            <span style={{color:"#E63946"}}>⚡ {calStats.streak} streak</span>
+            <span style={{color:"#457B9D"}}>🏆 {calStats.best} best</span>
+          </div>
+          {renderCalendar()}
+          <div style={{display:"flex",gap:12,marginTop:12,fontSize:10,color:T.tx3,flexWrap:"wrap"}}>
+            <span style={{display:"flex",alignItems:"center",gap:4}}><span style={{width:10,height:10,background:"#2A9D8F",borderRadius:2,display:"inline-block"}}/> Done</span>
+            <span style={{display:"flex",alignItems:"center",gap:4}}><span style={{width:10,height:10,background:"#F4A261",borderRadius:2,display:"inline-block"}}/> Partial</span>
+            <span style={{display:"flex",alignItems:"center",gap:4}}><span style={{width:10,height:10,background:T.rR,borderRadius:2,display:"inline-block"}}/> Missed</span>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
 
 
 // ─── Timer Page ───
-function TimerPage({sessions,setSessions}){
+function TimerPage({sessions,setSessions,reflections}){
   const T=useT();const w=useWindowWidth();const mob=w<480;
   const[tag,setTag]=useState(()=>sessionStorage.getItem("sl_tag")||"");
   const[running,setRunning]=useState(()=>sessionStorage.getItem("sl_running")==="true");
@@ -599,6 +626,9 @@ function TimerPage({sessions,setSessions}){
           <span style={{color:T.tx3}}>{formatHM(s.duration)}</span>
         </div>))}
       </div>
+      <div style={{display:"flex",justifyContent:"center",marginTop:40}}>
+  <button onClick={()=>exportToExcel(sessions,reflections)} disabled={sessions.length===0} style={{padding:"10px 24px",border:`2px solid ${T.bd3}`,background:T.btn,color:T.btnT,fontSize:11,fontFamily:F,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase",cursor:sessions.length>0?"pointer":"default",opacity:sessions.length>0?1:0.3,display:"flex",alignItems:"center",gap:6}}>↓ Export Excel</button>
+</div>
       <div style={{marginTop:48,padding:"14px 20px",borderRadius:12,background:T.ftBg,display:"flex",alignItems:"center",justifyContent:"center"}}>
         <span style={{fontSize:13,fontWeight:600,color:T.ftC,letterSpacing:"0.01em"}}>Vibe coded by Nithin Chowdary <span style={{color:"#E53E3E",fontSize:15}}>❤️</span></span>
       </div>
@@ -668,8 +698,7 @@ function TagBarChart({sorted,allTags}){if(sorted.length===0)return null;const mx
 function PeriodBarChart({dates,sessions}){const T=useT();const dt=getDayTotals(sessions);const data=dates.map(d=>({date:d,mins:dt[d]||0}));const mx=Math.max(...data.map(d=>d.mins),1);const pk=Math.max(...data.map(d=>d.mins));const bH=140;const tot=data.reduce((a,d)=>a+d.mins,0);const act=data.filter(d=>d.mins>0).length;const avg=act>0?Math.round(tot/act):0;const isW=dates.length<=7;return(<div><div style={{display:"flex",gap:24,marginBottom:16,fontFamily:F,flexWrap:"wrap"}}>{[["Total",tot],["Peak",pk],["Avg/day",avg]].map(([l,v])=>(<div key={l}><div style={{fontSize:22,fontWeight:700,color:T.tx}}>{formatHM(v)}</div><div style={{fontSize:10,color:T.tx3,textTransform:"uppercase",letterSpacing:"0.1em"}}>{l}</div></div>))}</div><div style={{position:"relative",overflowX:"auto",paddingBottom:8}}><div style={{display:"flex",alignItems:"flex-end",gap:isW?8:2,minWidth:isW?dates.length*52:dates.length*16,height:bH+50,paddingTop:24,position:"relative"}}>{pk>0&&(<div style={{position:"absolute",top:24,left:0,right:0,height:bH,pointerEvents:"none"}}><div style={{position:"absolute",bottom:`${(pk/mx)*bH}px`,left:0,right:0,borderTop:"2px dashed #E63946",opacity:0.6}}/><span style={{position:"absolute",bottom:`${(pk/mx)*bH+4}px`,right:0,fontSize:9,color:"#E63946",fontFamily:F,fontWeight:700}}>PEAK {formatHM(pk)}</span></div>)}{data.map((d)=>{const h=mx>0?(d.mins/mx)*bH:0;const isP=d.mins===pk&&d.mins>0;const dl=isW?new Date(d.date+"T12:00:00").toLocaleDateString("en-US",{weekday:"short"}):String(new Date(d.date+"T12:00:00").getDate());return(<div key={d.date} style={{flex:1,minWidth:isW?40:10,maxWidth:isW?60:24,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"flex-end",height:bH+50}}>{isW&&d.mins>0&&(<span style={{fontSize:10,fontFamily:F,fontWeight:600,marginBottom:3,color:isP?"#E63946":T.tx2}}>{formatHM(d.mins)}</span>)}<div style={{width:"60%",height:h,background:isP?"linear-gradient(180deg,#E63946,#FF6B6B)":getBarGradient(d.mins),borderRadius:"3px 3px 0 0",transition:"height 0.4s ease",minHeight:d.mins>0?4:2,position:"relative"}}>{isP&&(<div style={{position:"absolute",top:-16,left:"50%",transform:"translateX(-50%)",fontSize:12}}>⭐</div>)}</div><span style={{fontSize:isW?10:8,fontFamily:F,marginTop:4,color:isP?"#E63946":T.tx3,fontWeight:isP?700:400}}>{dl}</span></div>);})}</div></div><div style={{display:"flex",gap:16,marginTop:12,fontFamily:F,fontSize:10,color:T.tx3,flexWrap:"wrap"}}><span style={{display:"flex",alignItems:"center",gap:4}}><span style={{width:8,height:8,background:"#E63946",borderRadius:2,display:"inline-block"}}/> Peak / &lt;2h</span><span style={{display:"flex",alignItems:"center",gap:4}}><span style={{width:8,height:8,background:"#2A9D8F",borderRadius:2,display:"inline-block"}}/> 2h+</span><span style={{display:"flex",alignItems:"center",gap:4}}><span style={{width:8,height:8,background:"#0B6E4F",borderRadius:2,display:"inline-block"}}/> 4h+</span></div></div>);}
 
 // ─── Excel Export ───
-async function exportToExcel(sessions){const XLSX=await import("xlsx");const dm={};sessions.forEach(s=>{dm[s.date]=(dm[s.date]||0)+s.duration;});const dd=Object.entries(dm).sort((a,b)=>a[0].localeCompare(b[0])).map(([date,mins])=>({Date:date,Day:new Date(date+"T12:00:00").toLocaleDateString("en-US",{weekday:"long"}),Hours:+(mins/60).toFixed(2),Status:mins>=120?"🔥":"❌"}));const wm={};Object.entries(dm).forEach(([date,mins])=>{const d=new Date(date+"T12:00:00");const m=new Date(d);m.setDate(d.getDate()-((d.getDay()+6)%7));const s=new Date(m);s.setDate(m.getDate()+6);const l=`${m.toLocaleDateString("en-US",{month:"short",day:"numeric"})} - ${s.toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}`;wm[l]=(wm[l]||0)+mins;});const wd=Object.entries(wm).map(([w,m])=>({Week:w,Hours:+(m/60).toFixed(2)}));const mm={};Object.entries(dm).forEach(([date,mins])=>{const k=date.slice(0,7);mm[k]=(mm[k]||0)+mins;});const md=Object.entries(mm).sort((a,b)=>a[0].localeCompare(b[0])).map(([k,m])=>{const[y,mo]=k.split("-");return{Month:new Date(parseInt(y),parseInt(mo)-1).toLocaleDateString("en-US",{month:"long",year:"numeric"}),Hours:+(m/60).toFixed(2)};});const tm={};const tf={};sessions.forEach(s=>{tm[s.tag]=(tm[s.tag]||0)+s.duration;if(!tf[s.tag]||s.date<tf[s.tag])tf[s.tag]=s.date;});const td=Object.entries(tm).sort((a,b)=>b[1]-a[1]).map(([t,m])=>({Topic:t,Hours:+(m/60).toFixed(2),Started:tf[t]||""}));const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(dd),"Day-wise");XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(wd),"Week-wise");XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(md),"Month-wise");XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(td),"Topic-wise");XLSX.writeFile(wb,`FocusMaxing_Export_${todayStr()}.xlsx`);}
-
+async function exportToExcel(sessions,reflections){const XLSX=await import("xlsx");const dm={};sessions.forEach(s=>{dm[s.date]=(dm[s.date]||0)+s.duration;});const dd=Object.entries(dm).sort((a,b)=>a[0].localeCompare(b[0])).map(([date,mins])=>({Date:date,Day:new Date(date+"T12:00:00").toLocaleDateString("en-US",{weekday:"long"}),Hours:+(mins/60).toFixed(2),Status:mins>=120?"🔥":"❌",Reflection:reflections[date]?.note||""}));const wm={};Object.entries(dm).forEach(([date,mins])=>{const d=new Date(date+"T12:00:00");const m=new Date(d);m.setDate(d.getDate()-((d.getDay()+6)%7));const s=new Date(m);s.setDate(m.getDate()+6);const l=`${m.toLocaleDateString("en-US",{month:"short",day:"numeric"})} - ${s.toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}`;wm[l]=(wm[l]||0)+mins;});const wd=Object.entries(wm).map(([w,m])=>({Week:w,Hours:+(m/60).toFixed(2)}));const mm={};Object.entries(dm).forEach(([date,mins])=>{const k=date.slice(0,7);mm[k]=(mm[k]||0)+mins;});const md=Object.entries(mm).sort((a,b)=>a[0].localeCompare(b[0])).map(([k,m])=>{const[y,mo]=k.split("-");return{Month:new Date(parseInt(y),parseInt(mo)-1).toLocaleDateString("en-US",{month:"long",year:"numeric"}),Hours:+(m/60).toFixed(2)};});const tm={};const tf={};sessions.forEach(s=>{tm[s.tag]=(tm[s.tag]||0)+s.duration;if(!tf[s.tag]||s.date<tf[s.tag])tf[s.tag]=s.date;});const td=Object.entries(tm).sort((a,b)=>b[1]-a[1]).map(([t,m])=>({Topic:t,Hours:+(m/60).toFixed(2),Started:tf[t]||""}));const rd=Object.entries(reflections).filter(([,r])=>r.note).sort((a,b)=>b[0].localeCompare(a[0])).map(([date,r])=>({Date:date,Day:new Date(date+"T12:00:00").toLocaleDateString("en-US",{weekday:"long"}),Hours:r.hrsOverride!=null?+r.hrsOverride.toFixed(2):+((dm[date]||0)/60).toFixed(2),Reflection:r.note}));const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(dd),"Day-wise");XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(wd),"Week-wise");XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(md),"Month-wise");XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(td),"Topic-wise");XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rd),"Reflections");XLSX.writeFile(wb,`FocusMaxing_Export_${todayStr()}.xlsx`);}
 // ─── Goals Page ───
 function GoalsPage({sessions,goals,setGoals}){
   const T=useT();const w=useWindowWidth();const mob=w<480;
@@ -1030,7 +1059,12 @@ function ReflectionPage({sessions}){
   const T=useT();const[reflections,setReflections]=useState({});const[loaded,setLoaded]=useState(false);const[editKey,setEditKey]=useState(null);const[editText,setEditText]=useState("");const[editHrs,setEditHrs]=useState("");const w=useWindowWidth();const mob=w<480;
   useEffect(()=>{loadReflections().then(d=>{setReflections(d);setLoaded(true);});},[]);
   const saveR=async(date,note,hrsOverride)=>{setReflections(p=>({...p,[date]:{note,hrsOverride}}));await upsertReflection(date,note,hrsOverride);};
-  const dt=getDayTotals(sessions);const allDates=[...new Set([...Object.keys(dt),...Object.keys(reflections)])].sort((a,b)=>b.localeCompare(a));const today=todayStr();if(!allDates.includes(today))allDates.unshift(today);
+  const dt=getDayTotals(sessions);
+const earliest=sessions.length>0?sessions.reduce((a,s)=>s.date<a?s.date:a,sessions[0].date):todayStr();
+const allDates=[];
+const d=new Date(todayStr()+"T12:00:00");
+const end=new Date(earliest+"T12:00:00");
+while(d>=end){allDates.push(dateToStr(d));d.setDate(d.getDate()-1);}
   const startEdit=(date)=>{const r=reflections[date]||{};setEditKey(date);setEditText(r.note||"");setEditHrs(r.hrsOverride!=null?String(r.hrsOverride):"");};
   const saveRow=(date)=>{const hv=editHrs.trim()!==""?parseFloat(editHrs):null;saveR(date,editText,hv);setEditKey(null);};
   const getHrs=(date)=>{const r=reflections[date];if(r&&r.hrsOverride!=null)return r.hrsOverride;return(dt[date]||0)/60;};
@@ -1044,14 +1078,14 @@ function ReflectionPage({sessions}){
         <span style={{fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.1em",color:T.tx3}}>Date</span><span style={{fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.1em",color:T.tx3}}>Notes</span><span style={{fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.1em",textAlign:"right",color:T.tx3}}>Hours</span>
       </div>
       {allDates.map(date=>{
-        const hrs=getHrs(date);const mins=getMins(date);const isGreen=mins>=120;const r=reflections[date]||{};const isE=editKey===date;const isT=date===today;
+        const hrs=getHrs(date);const mins=getMins(date);const isGreen=mins>=120;const r=reflections[date]||{};const isE=editKey===date;const isT=date===todayStr();
         const dl=new Date(date+"T12:00:00").toLocaleDateString("en-US",{weekday:"short"});const dLabel=new Date(date+"T12:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric"});
         const rBg=isGreen?T.rG:T.rR;const rBd=isGreen?T.rGB:T.rRB;const hC=isGreen?"#2A9D8F":"#E63946";
         return(<div key={date} onClick={()=>{if(!isE)startEdit(date);}} style={{display:"grid",gridTemplateColumns:gc,gap:0,padding:"10px 0",borderBottom:`1px solid ${rBd}`,fontFamily:F,fontSize:13,background:rBg,cursor:isE?"default":"pointer",marginLeft:-8,marginRight:-8,paddingLeft:8,paddingRight:8,borderRadius:2}}>
           <div style={{display:"flex",flexDirection:"column",justifyContent:"center"}}><span style={{fontWeight:700,fontSize:12,color:T.tx}}>{dl}</span><span style={{fontSize:10,color:T.tx3}}>{dLabel}</span></div>
           <div style={{display:"flex",alignItems:"center",paddingRight:8,minWidth:0}}>
             {isE?(<div style={{display:"flex",gap:6,width:"100%",alignItems:"center"}}><input value={editText} onChange={e=>setEditText(e.target.value)} autoFocus placeholder="How was your study?" onKeyDown={e=>{if(e.key==="Enter")saveRow(date);if(e.key==="Escape")setEditKey(null);}} style={{flex:1,border:"none",borderBottom:`2px solid ${T.bd3}`,background:"transparent",fontSize:13,fontFamily:"inherit",padding:"4px 0",outline:"none",minWidth:0,color:T.tx}}/><button onClick={(e)=>{e.stopPropagation();saveRow(date);}} style={{border:`2px solid ${T.bd3}`,background:T.btn,color:T.btnT,padding:"4px 10px",fontSize:10,fontFamily:"inherit",fontWeight:700,cursor:"pointer",whiteSpace:"nowrap",flexShrink:0}}>Save</button></div>
-            ):(<span style={{color:r.note?T.tx:T.tx4,fontSize:13,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.note||(isT?"Tap to add...":"—")}</span>)}
+            ):(<span style={{color:r.note?T.tx:T.tx4,fontSize:13,whiteSpace:"pre-wrap",wordBreak:"break-word"}}>{r.note||(isT?"Tap to add...":"—")}</span>)}
           </div>
           <div style={{display:"flex",alignItems:"center",justifyContent:"flex-end"}}>
             {isE?(<input value={editHrs} onChange={e=>setEditHrs(e.target.value)} placeholder={hrs.toFixed(1)} type="number" step="0.1" onKeyDown={e=>{if(e.key==="Enter")saveRow(date);}} style={{width:45,border:"none",borderBottom:`2px solid ${T.bd3}`,background:"transparent",fontSize:13,fontFamily:"inherit",textAlign:"right",padding:"4px 0",outline:"none",color:T.tx}}/>
@@ -1138,14 +1172,14 @@ function SleepPage({sleepLogs,setSleepLogs}){
 // ─── MAIN APP ───
 // ═══════════════════════════════════════════
 export default function App(){
-  const[user,setUser]=useState(null);const[authLoading,setAuthLoading]=useState(true);const[page,setPage]=useState(PAGES.HABITS);const[sessions,setSessions]=useState([]);const[sleepLogs,setSleepLogs]=useState([]);const[goals,setGoals]=useState([]);const[habits,setHabits]=useState([]);const[habitLogs,setHabitLogs]=useState([]);const[loaded,setLoaded]=useState(false);const[sidebarOpen,setSidebarOpen]=useState(false);
+  const[user,setUser]=useState(null);const[authLoading,setAuthLoading]=useState(true);const[page,setPage]=useState(PAGES.HABITS);const[sessions,setSessions]=useState([]);const[sleepLogs,setSleepLogs]=useState([]);const[goals,setGoals]=useState([]);const[habits,setHabits]=useState([]);const[habitLogs,setHabitLogs]=useState([]);const[reflections,setReflections]=useState({});const[loaded,setLoaded]=useState(false);const[sidebarOpen,setSidebarOpen]=useState(false);
   const[isDark,setIsDark]=useState(()=>localStorage.getItem("fm_theme")==="dark");
   const toggleTheme=()=>{setIsDark(p=>{const n=!p;localStorage.setItem("fm_theme",n?"dark":"light");return n;});};
   const theme=isDark?D:L;const w=useWindowWidth();
   useEffect(()=>{document.body.style.background=theme.bg;document.documentElement.style.background=theme.bg;document.body.style.margin="0";},[isDark]);
   if(typeof document!=="undefined"){document.body.style.background=(localStorage.getItem("fm_theme")==="dark"?"#000":"#fff");document.documentElement.style.background=(localStorage.getItem("fm_theme")==="dark"?"#000":"#fff");}
   useEffect(()=>{supabase.auth.getSession().then(({data:{session}})=>{setUser(session?.user??null);setAuthLoading(false);});const{data:{subscription}}=supabase.auth.onAuthStateChange((_e,session)=>{setUser(session?.user??null);});return()=>subscription.unsubscribe();},[]);
-  useEffect(()=>{if(!user){setSessions([]);setSleepLogs([]);setGoals([]);setHabits([]);setHabitLogs([]);setLoaded(false);return;}setLoaded(false);Promise.all([loadSessions(),loadSleepLogs(),loadGoals(),loadHabits(),loadHabitLogs()]).then(([s,sl,g,h,hl])=>{setSessions(s);setSleepLogs(sl);setGoals(g);setHabits(h);setHabitLogs(hl);setLoaded(true);});},[user]);
+  useEffect(()=>{if(!user){setSessions([]);setSleepLogs([]);setGoals([]);setHabits([]);setHabitLogs([]);setLoaded(false);return;}setLoaded(false);Promise.all([loadSessions(),loadSleepLogs(),loadGoals(),loadHabits(),loadHabitLogs(),loadReflections()]).then(([s,sl,g,h,hl,ref])=>{setSessions(s);setSleepLogs(sl);setGoals(g);setHabits(h);setHabitLogs(hl);setReflections(ref);setLoaded(true);});},[user]);
   const handleLogout=async()=>{await supabase.auth.signOut();setUser(null);setSessions([]);setSleepLogs([]);setGoals([]);setHabits([]);setHabitLogs([]);setLoaded(false);setSidebarOpen(false);};
   const streak=calcStreak(sessions);const todayMins=sessions.filter(s=>s.date===todayStr()).reduce((a,s)=>a+s.duration,0);
   const getMaxWidth=()=>{if(page===PAGES.GOALS||page===PAGES.HABITS)return w<480?"100%":640;return w<480?"100%":540;};
@@ -1160,8 +1194,8 @@ export default function App(){
         <TopNavBar sessions={sessions} streak={streak} todayMins={todayMins} onMenuClick={()=>setSidebarOpen(true)}/>
         <Sidebar open={sidebarOpen} onClose={()=>setSidebarOpen(false)} page={page} setPage={setPage} sessions={sessions} onLogout={handleLogout} isDark={isDark} onToggleTheme={toggleTheme}/>
         {page===PAGES.HABITS&&<div style={{paddingTop:16}}><HabitsPage habits={habits} setHabits={setHabits} habitLogs={habitLogs} setHabitLogs={setHabitLogs}/></div>}
-        {page===PAGES.TIMER&&<><WeekStrip sessions={sessions}/><TimerPage sessions={sessions} setSessions={setSessions}/></>}
-       {page===PAGES.GOALS&&<div style={{paddingTop:16}}><GoalsPage sessions={sessions} goals={goals} setGoals={setGoals}/></div>}
+        {page===PAGES.TIMER&&<><WeekStrip sessions={sessions}/><TimerPage sessions={sessions} setSessions={setSessions} reflections={reflections}/></>}
+        {page===PAGES.GOALS&&<div style={{paddingTop:16}}><GoalsPage sessions={sessions} goals={goals} setGoals={setGoals}/></div>}
         {page===PAGES.REFLECTION&&<div style={{paddingTop:16}}><ReflectionPage sessions={sessions}/></div>}
         {page===PAGES.SLEEP&&<div style={{paddingTop:16}}><SleepPage sleepLogs={sleepLogs} setSleepLogs={setSleepLogs}/></div>}
       </div>
