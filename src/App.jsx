@@ -716,7 +716,7 @@ function GoalsPage({sessions,goals,setGoals}){
 
   let S=null;
   if(goal){
-    const ts=sessions.filter(s=>s.tag===goal.tag);
+    const ts=sessions.filter(s=>s.tag===goal.tag&&s.date>=goal.startDate);
     const totalMins=ts.reduce((a,s)=>a+s.duration,0);const totalH=totalMins/60;
     const startD=goal.startDate;
     const created=new Date(startD+"T12:00:00");const target=new Date(goal.targetDate+"T12:00:00");const today=new Date(todayStr()+"T12:00:00");
