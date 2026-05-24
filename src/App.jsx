@@ -1056,7 +1056,7 @@ function ReflectionPage({sessions}){
   useEffect(()=>{loadReflections().then(d=>{setReflections(d);setLoaded(true);});},[]);
   const saveR=async(date,note,hrsOverride)=>{setReflections(p=>({...p,[date]:{note,hrsOverride}}));await upsertReflection(date,note,hrsOverride);};
   const dt=getDayTotals(sessions);
-const earliest=sessions.length>0?sessions.reduce((a,s)=>s.date<a?s.date:a,sessions[0].date):todayStr();
+const earliest='2026-05-24';
 const allDates=[];
 const d=new Date(todayStr()+"T12:00:00");
 const end=new Date(earliest+"T12:00:00");
