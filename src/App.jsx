@@ -493,7 +493,7 @@ function HabitsPage({habits,setHabits,habitLogs,setHabitLogs}){
                   <span style={{fontSize:mob?14:16,fontWeight:800,color:s.streak>0?"#E63946":T.tx4}}>{s.streak}</span>
                 </div>
                 <button onClick={()=>toggleToday(habit.id)} style={{width:28,height:28,border:s.doneToday?"none":`2px solid ${T.bd2}`,background:s.doneToday?"#2A9D8F":"transparent",borderRadius:6,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:16,fontWeight:800,flexShrink:0,padding:0}} title={s.doneToday?"Uncheck today":"Mark today done"}>{s.doneToday&&"✓"}</button>
-                <button onClick={()=>delHabit(habit.id)} style={{border:"none",background:"none",cursor:"pointer",color:T.tx4,fontSize:14,padding:"0 2px",flexShrink:0}} title="Delete">✕</button>
+            
               </div>
             );
           })}
@@ -922,10 +922,6 @@ function GoalsPage({sessions,goals,setGoals}){
             <div style={{fontSize:15,fontWeight:700,color:T.tx}}>{t.value}</div>
             <div style={{fontSize:10,color:T.tx2,marginTop:2}}>{t.sub}</div>
           </div>))}
-        </div>
-
-        <div style={{textAlign:"center",marginTop:20,marginBottom:20}}>
-          <button onClick={()=>{if(window.confirm(`Delete "${goal.name}"?`))delGoal(goal.id);}} style={{border:`1px solid ${T.bd2}`,background:"transparent",color:T.tx4,padding:"8px 20px",fontSize:11,fontFamily:F,fontWeight:600,cursor:"pointer",borderRadius:4}}>Delete Goal</button>
         </div>
       </div>)}
     </div>
