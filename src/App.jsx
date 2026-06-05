@@ -42,7 +42,7 @@ function useWindowWidth() {
   return w;
 }
 
-const QUOTES = ["Flow State is Fragile","ఇంద్రియాలకు లొంగని భక్తియే నిజమైనది మనసును రంజింపజేసేవి తాత్కాలికం", "అనగా అనగా రాగం అతిశయించునుండు తినగా తినగా వేము తియ్యనుం సాధనమున పనులు సమకూరుదురా విశ్వదాభిరామ"];
+const QUOTES = ["Flow State is Fragile", "Karmanye vadhikaraste ma phaleshu kadachana"];
 
 let bellReady=false, bellSynth=null;
 function initBell(){if(bellReady)return;bellSynth=new Tone.PolySynth(Tone.Synth,{oscillator:{type:"sine"},envelope:{attack:0.005,decay:0.8,sustain:0.01,release:1.2},volume:-6}).toDestination();bellReady=true;}
@@ -185,7 +185,7 @@ function WeekStrip({sessions}){
 // ═══════════════════════════════════════════
 function Sidebar({open,onClose,page,setPage,sessions,onLogout,isDark,onToggleTheme}){
   const T=useT();
-  const items=[{key:PAGES.HABITS,label:"Habits",icon:"🔥"},{key:PAGES.TIMER,label:"Timer",icon:"⏱"},{key:PAGES.GOALS,label:"Goals",icon:"🎯"},{key:PAGES.REFLECTION,label:"Reflect",icon:"💭"},{key:PAGES.SLEEP,label:"Sleep",icon:"🌙"},{key:PAGES.TRACKER,label:"Tracker",icon:"📚"}];
+  const items=[{key:PAGES.TRACKER,label:"Tracker",icon:"📚"},{key:PAGES.TIMER,label:"Timer",icon:"⏱"},{key:PAGES.GOALS,label:"Goals",icon:"🎯"},{key:PAGES.REFLECTION,label:"Reflect",icon:"💭"},{key:PAGES.SLEEP,label:"Sleep",icon:"🌙"},{key:PAGES.HABITS,label:"Habits",icon:"🔥"}];
   const now=nowIST();const ys=String(now.getFullYear());const mn=now.toLocaleDateString("en-US",{month:"short"});
   const yMins=sessions.filter(s=>s.date.startsWith(ys)).reduce((a,s)=>a+s.duration,0);
   const mp=`${ys}-${String(now.getMonth()+1).padStart(2,"0")}`;
@@ -1333,7 +1333,7 @@ function TrackerPage() {
       <div style={{ textAlign: "center", marginBottom: 20 }}>
         <div style={{ fontSize: 36, fontWeight: 800, color: T.tx }}>{tabStreak > 0 ? `${tabStreak} 🔥` : "0"}</div>
         <div style={{ fontSize: 10, color: T.tx3, letterSpacing: 4, textTransform: "uppercase", marginBottom: 12 }}>
-          {activeTab === "cat" ? "CAT 2025 STREAK" : "PERSONAL STREAK"}
+          {activeTab === "cat" ? "CAT 2026 STREAK" : "PERSONAL STREAK"}
         </div>
         <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: T.tx3, marginBottom: 4 }}>
           <span>TODAY</span>
@@ -1398,7 +1398,7 @@ function TrackerPage() {
 // ─── MAIN APP ───
 // ═══════════════════════════════════════════
 export default function App(){
-  const[user,setUser]=useState(null);const[authLoading,setAuthLoading]=useState(true);const[page,setPage]=useState(PAGES.HABITS);const[sessions,setSessions]=useState([]);const[sleepLogs,setSleepLogs]=useState([]);const[goals,setGoals]=useState([]);const[habits,setHabits]=useState([]);const[habitLogs,setHabitLogs]=useState([]);const[reflections,setReflections]=useState({});const[loaded,setLoaded]=useState(false);const[sidebarOpen,setSidebarOpen]=useState(false);
+  const[user,setUser]=useState(null);const[authLoading,setAuthLoading]=useState(true);const[page,setPage]=useState(PAGES.TRACKER);const[sessions,setSessions]=useState([]);const[sleepLogs,setSleepLogs]=useState([]);const[goals,setGoals]=useState([]);const[habits,setHabits]=useState([]);const[habitLogs,setHabitLogs]=useState([]);const[reflections,setReflections]=useState({});const[loaded,setLoaded]=useState(false);const[sidebarOpen,setSidebarOpen]=useState(false);
   const[isDark,setIsDark]=useState(()=>localStorage.getItem("fm_theme")==="dark");
   const toggleTheme=()=>{setIsDark(p=>{const n=!p;localStorage.setItem("fm_theme",n?"dark":"light");return n;});};
   const theme=isDark?D:L;const w=useWindowWidth();
