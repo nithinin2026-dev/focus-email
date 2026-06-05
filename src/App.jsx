@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback, createContext, useContext } f
 import * as Tone from "tone";
 import { supabase } from "./supabaseClient";
 
-const PAGES = { HABITS: "habits", TIMER: "timer", GOALS: "goals",REFLECTION: "reflection", SLEEP: "sleep" };
+const PAGES = { HABITS: "habits", TIMER: "timer", GOALS: "goals", REFLECTION: "reflection", SLEEP: "sleep", TRACKER: "tracker" };
 
 // ═══════════════════════════════════════════
 // ─── THEME SYSTEM (persists in localStorage) ───
@@ -185,7 +185,7 @@ function WeekStrip({sessions}){
 // ═══════════════════════════════════════════
 function Sidebar({open,onClose,page,setPage,sessions,onLogout,isDark,onToggleTheme}){
   const T=useT();
-  const items=[{key:PAGES.HABITS,label:"Habits",icon:"🔥"},{key:PAGES.TIMER,label:"Timer",icon:"⏱"},{key:PAGES.GOALS,label:"Goals",icon:"🎯"},{key:PAGES.REFLECTION,label:"Reflect",icon:"💭"},{key:PAGES.SLEEP,label:"Sleep",icon:"🌙"}];
+  const items=[{key:PAGES.HABITS,label:"Habits",icon:"🔥"},{key:PAGES.TIMER,label:"Timer",icon:"⏱"},{key:PAGES.GOALS,label:"Goals",icon:"🎯"},{key:PAGES.REFLECTION,label:"Reflect",icon:"💭"},{key:PAGES.SLEEP,label:"Sleep",icon:"🌙"},{key:PAGES.TRACKER,label:"Tracker",icon:"📚"}];
   const now=nowIST();const ys=String(now.getFullYear());const mn=now.toLocaleDateString("en-US",{month:"short"});
   const yMins=sessions.filter(s=>s.date.startsWith(ys)).reduce((a,s)=>a+s.duration,0);
   const mp=`${ys}-${String(now.getMonth()+1).padStart(2,"0")}`;
@@ -1163,6 +1163,236 @@ function SleepPage({sleepLogs,setSleepLogs}){
     </div>
   );
 }
+//==============================================
+// ── TRACKER DATA ──────────────────────────────────────────
+const TRACKER_TABS = {
+  cat: [
+    {id:"anki_flash",     label:"Anki Flash Cards",  emoji:"🃏"},
+    {id:"cat_quant_time", label:"CAT Quant 1.5hrs",  emoji:"🔢"},
+    {id:"cat_rc_passage", label:"CAT RC",            emoji:"📖"},
+    {id:"cat_lrdi_time",  label:"CAT LRDI 1hr",      emoji:"🧩"},
+    {id:"bank_reasoning", label:"Banking Reasoning", emoji:"🧠"}
+  ],
+  personal: {
+    morning: [
+      {id:"pills_am", label:"Pills (AM)", emoji:"💊"},
+      {id:"cream_am", label:"Cream (AM)", emoji:"🧴"},
+      {id:"kettle",   label:"Kettle",     emoji:"🫖"}
+    ],
+    evening: [
+      {id:"cream_pm", label:"Cream (PM)", emoji:"🧴"},
+      {id:"pills_pm", label:"Pills (PM)", emoji:"💊"}
+    ]
+  }
+};
+
+const getAllHabits = (tab) => {
+  const t = TRACKER_TABS[tab];
+  if (!t) return [];
+  return Array.isArray(t) ? t : Object.values(t).flat();
+};
+
+async function loadTrackerLogs() {
+  const { data, error } = await supabase.from("daily_tracker").select("*");
+  if (error) return [];
+  return data;
+}
+
+async function toggleTrackerHabit(userId, date, tab, habitId, currentDone) {
+  const newDone = !currentDone;
+  await supabase.from("daily_tracker").upsert(
+    { user_id: userId, date, tab, habit_id: habitId, done: newDone },
+    { onConflict: "user_id,date,tab,habit_id" }
+  );
+  return newDone;
+}
+
+function TrackerPage() {
+  const T = useT();
+  const [activeTab, setActiveTab] = useState("cat");
+  const [logs, setLogs] = useState([]);
+  const [userId, setUserId] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const w = useWindowWidth();
+  const mob = w < 480;
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) setUserId(user.id);
+    });
+    loadTrackerLogs().then(d => { setLogs(d); setLoading(false); });
+  }, []);
+
+  const today = todayStr();
+
+  const isDone = (tab, habitId) =>
+    logs.some(l => l.date === today && l.tab === tab && l.habit_id === habitId && l.done);
+
+  const toggle = async (tab, habitId) => {
+    if (!userId) return;
+    const current = isDone(tab, habitId);
+    const newDone = await toggleTrackerHabit(userId, today, tab, habitId, current);
+    setLogs(prev => {
+      const filtered = prev.filter(l => !(l.date === today && l.tab === tab && l.habit_id === habitId));
+      return [...filtered, { user_id: userId, date: today, tab, habit_id: habitId, done: newDone }];
+    });
+  };
+
+  const getStreak = (tab, habitId) => {
+    let s = 0;
+    const d = new Date(today + "T12:00:00");
+    while (true) {
+      const key = dateToStr(d);
+      const done = logs.some(l => l.date === key && l.tab === tab && l.habit_id === habitId && l.done);
+      if (!done && key === today) { d.setDate(d.getDate() - 1); continue; }
+      if (!done) break;
+      s++;
+      d.setDate(d.getDate() - 1);
+    }
+    return s;
+  };
+
+  const getTabStreak = (tab) => {
+    const habits = getAllHabits(tab);
+    let s = 0;
+    const d = new Date(today + "T12:00:00");
+    while (true) {
+      const key = dateToStr(d);
+      const allDone = habits.every(h => logs.some(l => l.date === key && l.tab === tab && l.habit_id === h.id && l.done));
+      if (!allDone && key === today) { d.setDate(d.getDate() - 1); continue; }
+      if (!allDone) break;
+      s++;
+      d.setDate(d.getDate() - 1);
+    }
+    return s;
+  };
+
+  const renderHabits = (tab, habits, sectionLabel) => {
+    const allDone = habits.every(h => isDone(tab, h.id));
+    return (
+      <div style={{ marginBottom: 16 }}>
+        {sectionLabel && (
+          <div style={{ fontSize: 9, letterSpacing: 4, color: T.tx3, textTransform: "uppercase", marginBottom: 8, fontFamily: F, fontWeight: 600 }}>
+            {sectionLabel}
+          </div>
+        )}
+        {habits.map(h => {
+          const done = isDone(tab, h.id);
+          const streak = getStreak(tab, h.id);
+          return (
+            <div key={h.id} onClick={() => toggle(tab, h.id)}
+              style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", marginBottom: 6, borderRadius: 8,
+                background: done ? (T === D ? "#0a1a0a" : "#f0fff4") : T.bg2,
+                border: `1px solid ${done ? "#1a3a1a" : T.bd}`,
+                cursor: "pointer", userSelect: "none", fontFamily: F }}>
+              <div style={{ width: 18, height: 18, borderRadius: "50%", border: `1.5px solid ${done ? "#4ade80" : T.tx4}`,
+                background: done ? "#4ade80" : "transparent", display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 9, color: "#000", flexShrink: 0, fontWeight: 700 }}>
+                {done && "✓"}
+              </div>
+              <span style={{ fontSize: 14 }}>{h.emoji}</span>
+              <span style={{ flex: 1, fontSize: 12, color: done ? "#4ade80" : T.tx2, fontWeight: 600,
+                textDecoration: done ? "line-through" : "none" }}>
+                {h.label}
+              </span>
+              {streak > 0 && (
+                <span style={{ fontSize: 11, fontWeight: 700, color: "#ff6b35" }}>🔥{streak}</span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
+  const tabs = ["cat", "personal"];
+  const tabLabels = { cat: "📚 CAT", personal: "🌿 Self" };
+
+  if (loading) return <div style={{ textAlign: "center", padding: "40px 0", fontFamily: F, color: T.tx3 }}>Loading...</div>;
+
+  const habits = getAllHabits(activeTab);
+  const doneTodayCount = habits.filter(h => isDone(activeTab, h.id)).length;
+  const tabStreak = getTabStreak(activeTab);
+  const pct = Math.round((doneTodayCount / habits.length) * 100);
+
+  return (
+    <div style={{ fontFamily: F }}>
+      {/* Tab toggle */}
+      <div style={{ display: "flex", background: T.bg2, borderRadius: 8, overflow: "hidden", marginBottom: 20, border: `1px solid ${T.bd}` }}>
+        {tabs.map(tab => (
+          <button key={tab} onClick={() => setActiveTab(tab)}
+            style={{ flex: 1, padding: "10px 8px", border: "none", background: activeTab === tab ? T.btn : "transparent",
+              color: activeTab === tab ? T.btnT : T.tx3, fontFamily: F, fontSize: 12, fontWeight: 700,
+              letterSpacing: "0.05em", cursor: "pointer" }}>
+            {tabLabels[tab]}
+          </button>
+        ))}
+      </div>
+
+      {/* Streak + progress */}
+      <div style={{ textAlign: "center", marginBottom: 20 }}>
+        <div style={{ fontSize: 36, fontWeight: 800, color: T.tx }}>{tabStreak > 0 ? `${tabStreak} 🔥` : "0"}</div>
+        <div style={{ fontSize: 10, color: T.tx3, letterSpacing: 4, textTransform: "uppercase", marginBottom: 12 }}>
+          {activeTab === "cat" ? "CAT 2025 STREAK" : "PERSONAL STREAK"}
+        </div>
+        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: T.tx3, marginBottom: 4 }}>
+          <span>TODAY</span>
+          <span style={{ color: doneTodayCount === habits.length ? "#ff6b35" : T.tx3, fontWeight: 700 }}>
+            {doneTodayCount}/{habits.length}
+          </span>
+        </div>
+        <div style={{ height: 3, background: T.bg3, borderRadius: 2, overflow: "hidden" }}>
+          <div style={{ height: "100%", width: `${pct}%`, background: pct === 100 ? "#ff6b35" : T.tx3,
+            borderRadius: 2, transition: "width 0.4s" }} />
+        </div>
+      </div>
+
+      {pct === 100 && (
+        <div style={{ background: T === D ? "#0f0f05" : "#fffbf0", border: "1px solid #ff6b35", borderRadius: 8,
+          padding: 10, textAlign: "center", fontSize: 11, color: "#ff6b35", letterSpacing: 2,
+          marginBottom: 16, fontWeight: 700 }}>
+          🔥 {activeTab === "cat" ? "CAT STREAK SAVED!" : "PERSONAL DONE!"}
+        </div>
+      )}
+
+      {/* Habits */}
+      {activeTab === "cat" && renderHabits("cat", TRACKER_TABS.cat)}
+      {activeTab === "personal" && (
+        <>
+          {renderHabits("personal", TRACKER_TABS.personal.morning, "☀️ Morning")}
+          {renderHabits("personal", TRACKER_TABS.personal.evening, "🌙 Evening")}
+        </>
+      )}
+
+      {/* Heatmap */}
+      <div style={{ fontSize: 9, letterSpacing: 4, color: T.tx3, textTransform: "uppercase", margin: "20px 0 8px", fontWeight: 600 }}>
+        LAST 14 DAYS
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(14, 1fr)", gap: 2, marginBottom: 4 }}>
+        {Array.from({ length: 14 }, (_, i) => {
+          const d = new Date(today + "T12:00:00");
+          d.setDate(d.getDate() - (13 - i));
+          const key = dateToStr(d);
+          const habits = getAllHabits(activeTab);
+          const done = habits.filter(h => logs.some(l => l.date === key && l.tab === activeTab && l.habit_id === h.id && l.done)).length;
+          const p = done / habits.length;
+          const bg = p === 0 ? T.bg3 : p < 0.4 ? "#2d2d5c" : p < 1 ? "#6b5cf6" : "#ff6b35";
+          return (
+            <div key={key} style={{ height: 16, borderRadius: 2, background: bg,
+              border: key === today ? "1.5px solid #ff6b35" : "1.5px solid transparent" }}
+              title={`${key}: ${done}/${habits.length}`} />
+          );
+        })}
+      </div>
+      <div style={{ display: "flex", gap: 8, fontSize: 8, color: T.tx4 }}>
+        <span>■ None</span><span style={{ color: "#2d2d5c" }}>■ Some</span>
+        <span style={{ color: "#6b5cf6" }}>■ Most</span><span style={{ color: "#ff6b35" }}>■ All</span>
+      </div>
+    </div>
+  );
+}
+
+//==============================================
 
 // ═══════════════════════════════════════════
 // ─── MAIN APP ───
@@ -1193,7 +1423,7 @@ export default function App(){
         {page===PAGES.TIMER&&<><WeekStrip sessions={sessions}/><TimerPage sessions={sessions} setSessions={setSessions} reflections={reflections}/></>}
         {page===PAGES.GOALS&&<div style={{paddingTop:16}}><GoalsPage sessions={sessions} goals={goals} setGoals={setGoals}/></div>}
         {page===PAGES.REFLECTION&&<div style={{paddingTop:16}}><ReflectionPage sessions={sessions}/></div>}
-        {page===PAGES.SLEEP&&<div style={{paddingTop:16}}><SleepPage sleepLogs={sleepLogs} setSleepLogs={setSleepLogs}/></div>}
+        {page===PAGES.TRACKER&&<div style={{paddingTop:16}}><TrackerPage/></div>}
       </div>
     </ThemeContext.Provider>
   );
