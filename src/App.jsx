@@ -1423,6 +1423,7 @@ export default function App(){
         {page===PAGES.TIMER&&<><WeekStrip sessions={sessions}/><TimerPage sessions={sessions} setSessions={setSessions} reflections={reflections}/></>}
         {page===PAGES.GOALS&&<div style={{paddingTop:16}}><GoalsPage sessions={sessions} goals={goals} setGoals={setGoals}/></div>}
         {page===PAGES.REFLECTION&&<div style={{paddingTop:16}}><ReflectionPage sessions={sessions}/></div>}
+        {page===PAGES.SLEEP&&<div style={{paddingTop:16}}><SleepPage sleepLogs={sleepLogs} setSleepLogs={setSleepLogs}/></div>}
         {page===PAGES.TRACKER&&<div style={{paddingTop:16}}><TrackerPage/></div>}
       </div>
     </ThemeContext.Provider>
