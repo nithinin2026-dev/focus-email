@@ -1167,11 +1167,11 @@ function SleepPage({sleepLogs,setSleepLogs}){
 // ── TRACKER DATA ──────────────────────────────────────────
 const TRACKER_TABS = {
   cat: [
-    {id:"anki_flash",     label:"Anki Flash Cards",  emoji:"🃏"},
-    {id:"cat_quant_time", label:"CAT Quant 1.5hrs",  emoji:"🔢"},
-    {id:"cat_rc_passage", label:"CAT RC",            emoji:"📖"},
-    {id:"cat_lrdi_time",  label:"CAT LRDI 1hr",      emoji:"🧩"},
-    {id:"bank_reasoning", label:"Banking Reasoning", emoji:"🧠"}
+    {id:"anki_flash",     label:"Flash Cards",  emoji:"🃏"},
+    {id:"cat_quant_time", label:"Quant 1hr",  emoji:"🔢"},
+    {id:"cat_rc_passage", label:"Reasoning 1hr",            emoji:"📖"},
+    {id:"cat_lrdi_time",  label:"English 30min",      emoji:"🧩"},
+    {id:"bank_reasoning", label:"Mocks practice", emoji:"🧠"}
   ],
   personal: {
     morning: [
@@ -1306,7 +1306,7 @@ function TrackerPage() {
   };
 
   const tabs = ["cat", "personal"];
-  const tabLabels = { cat: "📚 CAT", personal: "🌿 Self" };
+  const tabLabels = { cat: "📚 LevelUp", personal: "🌿 Health" };
 
   if (loading) return <div style={{ textAlign: "center", padding: "40px 0", fontFamily: F, color: T.tx3 }}>Loading...</div>;
 
