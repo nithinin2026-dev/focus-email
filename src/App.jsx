@@ -1351,7 +1351,7 @@ function TrackerPage() {
         <div style={{ background: T === D ? "#0f0f05" : "#fffbf0", border: "1px solid #ff6b35", borderRadius: 8,
           padding: 10, textAlign: "center", fontSize: 11, color: "#ff6b35", letterSpacing: 2,
           marginBottom: 16, fontWeight: 700 }}>
-          🔥 {activeTab === "cat" ? "CAT STREAK SAVED!" : "PERSONAL DONE!"}
+          🔥 {activeTab === "cat" ? "STREAK SAVED!" : "PERSONAL DONE!"}
         </div>
       )}
 
