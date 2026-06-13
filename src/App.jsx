@@ -42,7 +42,7 @@ function useWindowWidth() {
   return w;
 }
 
-const QUOTES = ["Flow State is Fragile", "Karmanye vadhikaraste ma phaleshu kadachana"];
+const QUOTES = ["Flow State is Fragile"];
 
 let bellReady=false, bellSynth=null;
 function initBell(){if(bellReady)return;bellSynth=new Tone.PolySynth(Tone.Synth,{oscillator:{type:"sine"},envelope:{attack:0.005,decay:0.8,sustain:0.01,release:1.2},volume:-6}).toDestination();bellReady=true;}
@@ -1333,7 +1333,7 @@ function TrackerPage() {
       <div style={{ textAlign: "center", marginBottom: 20 }}>
         <div style={{ fontSize: 36, fontWeight: 800, color: T.tx }}>{tabStreak > 0 ? `${tabStreak} 🔥` : "0"}</div>
         <div style={{ fontSize: 10, color: T.tx3, letterSpacing: 4, textTransform: "uppercase", marginBottom: 12 }}>
-          {activeTab === "cat" ? "CAT 2026 STREAK" : "PERSONAL STREAK"}
+          {activeTab === "cat" ? "2026 LevelUp" : "PERSONAL STREAK"}
         </div>
         <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: T.tx3, marginBottom: 4 }}>
           <span>TODAY</span>
