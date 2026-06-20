@@ -1167,11 +1167,11 @@ function SleepPage({sleepLogs,setSleepLogs}){
 // ── TRACKER DATA ──────────────────────────────────────────
 const TRACKER_TABS = {
   cat: [
-    {id:"anki_flash",     label:"Flash Cards",  emoji:"🃏"},
-    {id:"cat_quant_time", label:"Quant 1hr",  emoji:"🔢"},
-    {id:"cat_rc_passage", label:"Reasoning 1hr",            emoji:"📖"},
-    {id:"cat_lrdi_time",  label:"English 30min",      emoji:"🧩"},
-    {id:"bank_reasoning", label:"Mocks practice", emoji:"🧠"}
+    {id:"anki_flash",     label:"Anki complete",  emoji:"🃏"},
+    {id:"cat_quant_time", label:"1 hour Quant",  emoji:"🔢"},
+    {id:"cat_rc_passage", label:"1 hour Reasoning",            emoji:"📖"},
+    {id:"cat_lrdi_time",  label:"1 hour English",      emoji:"🧩"},
+    {id:"bank_reasoning", label:"1 hour Mock Test", emoji:"🧠"}
   ],
   personal: {
     morning: [
