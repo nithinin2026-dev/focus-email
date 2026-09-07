@@ -597,6 +597,122 @@ function SpendingPage(){
     <div style={{fontFamily:F}}>
       <div style={{fontSize:11,textTransform:"uppercase",letterSpacing:"0.15em",color:T.tx3,marginBottom:16,fontWeight:600}}>💸 Spending</div>
       {renderTodaySection()}
+      
+      {/* Show current month entries (excluding today) */}
+      {monthMap[currentMonth] && monthMap[currentMonth].filter(e => e.date !== today).length > 0 && (
+        renderMonthSection(currentMonth)
+      )}
+      
+      {pastMonths.map(mk => renderMonthSection(mk))}
+      {entries.length===0&&(<div style={{textAlign:"center",padding:"40px 20px",color:T.tx4,fontSize:14}}><div style={{fontSize:48,marginBottom:16}}>💸</div><div style={{fontWeight:700,color:T.tx3,marginBottom:8}}>No entries yet</div><div>Tap today's row to add your first entry</div></div>)}
+    </div>
+  );
+}
+
+  const renderMonthSection=(mk)=>{
+    const isExpanded=!!expandedMonths[mk];
+    const total=monthTotal(mk);const cats=monthCatTotals(mk);
+    const rows=[...monthMap[mk]].sort((a,b)=>b.date.localeCompare(a.date)||b.amount-a.amount);
+    return(<div key={mk} style={{marginBottom:16}}>
+      <div onClick={()=>toggleMonth(mk)} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 14px",background:T.bg2,borderRadius:isExpanded?"10px 10px 0 0":10,border:`1px solid ${T.bd}`,cursor:"pointer",userSelect:"none",fontFamily:F}}>
+        <div style={{display:"flex",alignItems:"center",gap:10}}>
+          <span style={{fontSize:12,color:T.tx3,display:"inline-block",transform:isExpanded?"rotate(90deg)":"rotate(0deg)",transition:"transform 0.2s"}}>▶</span>
+          <span style={{fontSize:14,fontWeight:800,color:T.tx}}>{monthLabel(mk)}</span>
+        </div>
+        <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",justifyContent:"flex-end"}}>
+          {cats.need>0&&<span style={{fontSize:12,fontWeight:600,color:"#2A9D8F"}}>₹{Math.round(cats.need).toLocaleString("en-IN")}</span>}
+          {cats.waste>0&&<span style={{fontSize:12,fontWeight:600,color:"#E63946"}}>₹{Math.round(cats.waste).toLocaleString("en-IN")}</span>}
+          <span style={{fontSize:14,fontWeight:800,color:T.tx}}>₹{Math.round(total).toLocaleString("en-IN")}</span>
+        </div>
+      </div>
+      {isExpanded&&(<div style={{border:`1px solid ${T.bd}`,borderTop:"none",borderRadius:"0 0 10px 10px",overflow:"hidden",fontFamily:F}}>
+        {rows.map((e,idx)=>{
+          const c=e.category==="want"?"waste":e.category;
+          const dl=new Date(e.date+"T12:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric"});
+          const isLast=idx===rows.length-1;
+          return(<div key={e.id} style={{display:"grid",gridTemplateColumns:gc,gap:0,padding:"10px 12px",borderBottom:isLast?"none":`1px solid ${T.bd}`,background:idx%2===0?T.bg:T.bg2,alignItems:"center"}}>
+            <span style={{fontSize:12,fontWeight:600,color:T.tx3}}>{dl}</span>
+            <span style={{fontSize:14,fontWeight:600,color:T.tx,paddingRight:8,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{e.label}</span>
+            <span style={{fontSize:14,fontWeight:700,color:catColor(c),textAlign:"right"}}>₹{Number(e.amount).toLocaleString("en-IN",{maximumFractionDigits:0})}</span>
+          </div>);
+        })}
+        {/* Month totals */}
+        {(()=>{
+          const needT=rows.filter(e=>e.category==="need").reduce((a,e)=>a+Number(e.amount),0);
+          const wasteT=rows.filter(e=>e.category!=="need").reduce((a,e)=>a+Number(e.amount),0);
+          const tot=rows.reduce((a,e)=>a+Number(e.amount),0);
+          return(<div style={{display:"flex",gap:12,padding:"10px 12px",borderTop:`1px solid ${T.bd2}`,flexWrap:"wrap",alignItems:"center"}}>
+            {needT>0&&<span style={{color:"#2A9D8F",fontWeight:600,fontSize:12}}>₹{Math.round(needT).toLocaleString("en-IN")}</span>}
+            {wasteT>0&&<span style={{color:"#E63946",fontWeight:600,fontSize:12}}>₹{Math.round(wasteT).toLocaleString("en-IN")}</span>}
+            <span style={{fontWeight:800,color:T.tx,fontSize:14}}>₹{Math.round(tot).toLocaleString("en-IN")}</span>
+          </div>);
+        })()}
+      </div>)}
+    </div>);
+  };
+
+  return(
+    <div style={{fontFamily:F}}>
+      <div style={{fontSize:11,textTransform:"uppercase",letterSpacing:"0.15em",color:T.tx3,marginBottom:16,fontWeight:600}}>💸 Spending</div>
+      {renderTodaySection()}
+      
+      {/* Show current month entries (excluding today) */}
+      {monthMap[currentMonth] && monthMap[currentMonth].filter(e => e.date !== today).length > 0 && (
+        renderMonthSection(currentMonth)
+      )}
+      
+      {pastMonths.map(mk => renderMonthSection(mk))}
+      {entries.length===0&&(<div style={{textAlign:"center",padding:"40px 20px",color:T.tx4,fontSize:14}}><div style={{fontSize:48,marginBottom:16}}>💸</div><div style={{fontWeight:700,color:T.tx3,marginBottom:8}}>No entries yet</div><div>Tap today's row to add your first entry</div></div>)}
+    </div>
+  );
+}
+
+  const renderMonthSection=(mk)=>{
+    const isExpanded=!!expandedMonths[mk];
+    const total=monthTotal(mk);const cats=monthCatTotals(mk);
+    const rows=[...monthMap[mk]].sort((a,b)=>b.date.localeCompare(a.date)||b.amount-a.amount);
+    return(<div key={mk} style={{marginBottom:16}}>
+      <div onClick={()=>toggleMonth(mk)} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 14px",background:T.bg2,borderRadius:isExpanded?"10px 10px 0 0":10,border:`1px solid ${T.bd}`,cursor:"pointer",userSelect:"none",fontFamily:F}}>
+        <div style={{display:"flex",alignItems:"center",gap:10}}>
+          <span style={{fontSize:12,color:T.tx3,display:"inline-block",transform:isExpanded?"rotate(90deg)":"rotate(0deg)",transition:"transform 0.2s"}}>▶</span>
+          <span style={{fontSize:14,fontWeight:800,color:T.tx}}>{monthLabel(mk)}</span>
+        </div>
+        <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",justifyContent:"flex-end"}}>
+          {cats.need>0&&<span style={{fontSize:12,fontWeight:600,color:"#2A9D8F"}}>₹{Math.round(cats.need).toLocaleString("en-IN")}</span>}
+          {cats.waste>0&&<span style={{fontSize:12,fontWeight:600,color:"#E63946"}}>₹{Math.round(cats.waste).toLocaleString("en-IN")}</span>}
+          <span style={{fontSize:14,fontWeight:800,color:T.tx}}>₹{Math.round(total).toLocaleString("en-IN")}</span>
+        </div>
+      </div>
+      {isExpanded&&(<div style={{border:`1px solid ${T.bd}`,borderTop:"none",borderRadius:"0 0 10px 10px",overflow:"hidden",fontFamily:F}}>
+        {rows.map((e,idx)=>{
+          const c=e.category==="want"?"waste":e.category;
+          const dl=new Date(e.date+"T12:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric"});
+          const isLast=idx===rows.length-1;
+          return(<div key={e.id} style={{display:"grid",gridTemplateColumns:gc,gap:0,padding:"10px 12px",borderBottom:isLast?"none":`1px solid ${T.bd}`,background:idx%2===0?T.bg:T.bg2,alignItems:"center"}}>
+            <span style={{fontSize:12,fontWeight:600,color:T.tx3}}>{dl}</span>
+            <span style={{fontSize:14,fontWeight:600,color:T.tx,paddingRight:8,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{e.label}</span>
+            <span style={{fontSize:14,fontWeight:700,color:catColor(c),textAlign:"right"}}>₹{Number(e.amount).toLocaleString("en-IN",{maximumFractionDigits:0})}</span>
+          </div>);
+        })}
+        {/* Month totals */}
+        {(()=>{
+          const needT=rows.filter(e=>e.category==="need").reduce((a,e)=>a+Number(e.amount),0);
+          const wasteT=rows.filter(e=>e.category!=="need").reduce((a,e)=>a+Number(e.amount),0);
+          const tot=rows.reduce((a,e)=>a+Number(e.amount),0);
+          return(<div style={{display:"flex",gap:12,padding:"10px 12px",borderTop:`1px solid ${T.bd2}`,flexWrap:"wrap",alignItems:"center"}}>
+            {needT>0&&<span style={{color:"#2A9D8F",fontWeight:600,fontSize:12}}>₹{Math.round(needT).toLocaleString("en-IN")}</span>}
+            {wasteT>0&&<span style={{color:"#E63946",fontWeight:600,fontSize:12}}>₹{Math.round(wasteT).toLocaleString("en-IN")}</span>}
+            <span style={{fontWeight:800,color:T.tx,fontSize:14}}>₹{Math.round(tot).toLocaleString("en-IN")}</span>
+          </div>);
+        })()}
+      </div>)}
+    </div>);
+  };
+
+  return(
+    <div style={{fontFamily:F}}>
+      <div style={{fontSize:11,textTransform:"uppercase",letterSpacing:"0.15em",color:T.tx3,marginBottom:16,fontWeight:600}}>💸 Spending</div>
+      {renderTodaySection()}
       {pastMonths.map(mk=>renderMonthSection(mk))}
       {entries.length===0&&(<div style={{textAlign:"center",padding:"40px 20px",color:T.tx4,fontSize:14}}><div style={{fontSize:48,marginBottom:16}}>💸</div><div style={{fontWeight:700,color:T.tx3,marginBottom:8}}>No entries yet</div><div>Tap today's row to add your first entry</div></div>)}
     </div>
