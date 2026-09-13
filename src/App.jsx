@@ -75,9 +75,9 @@ const F="'Nunito', sans-serif";
 
 const TRACKER_TABS={
   cat:[
-    {id:"anki_flash",label:"10 puzzles + 15 mixed Reasoning",emoji:"🃏"},
-    {id:"cat_quant_time",label:"Drill + 30 arithmetic + 30 Math",emoji:"🔢"},
-    {id:"cat_rc_passage",label:"10 errors + 10 para + Vocabulary",emoji:"📖"},
+    {id:"anki_flash",label:"2.5hr banking",emoji:"🃏"},
+    {id:"cat_quant_time",label:"1hr banking",emoji:"🔢"},
+    {id:"cat_rc_passage",label:"2hr GS",emoji:"📖"},
     {id:"cat_lrdi_time",label:"Mock Test + analysis",emoji:"🧩"},
     {id:"bank_reasoning",label:"2500+ Hardwork",emoji:"🧠"},
   ],
