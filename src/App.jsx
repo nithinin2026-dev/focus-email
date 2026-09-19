@@ -391,11 +391,11 @@ function GymPage({gymLogs,setGymLogs}){
   const[note,setNote]=useState("");
   const[newEx,setNewEx]=useState("");
   const[saving,setSaving]=useState(false);
-  const today=todayStr();
+    const today=todayStr();
   const earliest="2026-05-24";
   const allDates=[];
   const d=new Date(today+"T12:00:00");const end=new Date(earliest+"T12:00:00");
-  while(d>=end){const k=dateToStr(d);if(gymLogs.some(g=>g.date===k)||k===today)allDates.push(k);d.setDate(d.getDate()-1);}
+  while(d>=end){allDates.push(dateToStr(d));d.setDate(d.getDate()-1);}
   const getLog=(date)=>gymLogs.find(g=>g.date===date);
   const startEdit=(date)=>{const log=getLog(date);setEditKey(date);setExercises(log?[...log.exercises]:[]);setNote(log?.note||"");setNewEx("");};
   const addExercise=()=>{if(!newEx.trim())return;setExercises(p=>[...p,newEx.trim()]);setNewEx("");};
@@ -457,7 +457,7 @@ function GymPage({gymLogs,setGymLogs}){
           </div>
         );
       })}
-      {allDates.length===0&&(<div style={{textAlign:"center",padding:"60px 20px",color:T.tx4,fontSize:14}}><div style={{fontSize:48,marginBottom:16}}>🏋️</div><div style={{fontWeight:700,color:T.tx3,marginBottom:8}}>No gym logs yet</div></div>)}
+      {gymLogs.length===0&&(<div style={{textAlign:"center",padding:"60px 20px",color:T.tx4,fontSize:14}}><div style={{fontSize:48,marginBottom:16}}>🏋️</div><div style={{fontWeight:700,color:T.tx3,marginBottom:8}}>No gym logs yet</div></div>)}
       <div style={{display:"flex",gap:16,marginTop:20,fontSize:10,color:T.tx3}}><span style={{display:"flex",alignItems:"center",gap:4}}><span style={{width:10,height:10,background:T.rG,border:`1px solid ${T.rGB}`,display:"inline-block",borderRadius:2}}/> Logged</span><span style={{display:"flex",alignItems:"center",gap:4}}><span style={{width:10,height:10,background:T.rR,border:`1px solid ${T.rRB}`,display:"inline-block",borderRadius:2}}/> Today</span><span>Tap to edit</span></div>
     </div>
   );
