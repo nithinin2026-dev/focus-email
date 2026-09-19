@@ -75,15 +75,14 @@ const F="'Nunito', sans-serif";
 
 const TRACKER_TABS={
   cat:[
-    {id:"anki_flash",label:"2.5hr banking",emoji:"🃏"},
-    {id:"cat_quant_time",label:"1hr banking",emoji:"🔢"},
-    {id:"cat_rc_passage",label:"2hr GS",emoji:"📖"},
+    {id:"anki_flash",label:"2hr banking",emoji:"🃏"},
+    {id:"cat_quant_time",label:"2hr banking",emoji:"🔢"},
     {id:"cat_lrdi_time",label:"Mock Test + analysis",emoji:"🧩"},
     {id:"bank_reasoning",label:"2500+ Hardwork",emoji:"🧠"},
   ],
   personal:{
     morning:[{id:"pills_am",label:"Pills (AM)",emoji:"💊"},{id:"cream_am",label:"Cream (AM)",emoji:"🧴"},{id:"kettle",label:"Kettle",emoji:"🫖"}],
-    evening:[{id:"cream_pm",label:"Cream (PM)",emoji:"🧴"},{id:"pills_pm",label:"Pills (PM)",emoji:"💊"}],
+    evening:[{id:"pills_pm",label:"Pills (PM)",emoji:"💊"}],
   },
 };
 function getAllTrackerHabits(tab){const t=TRACKER_TABS[tab];if(!t)return[];return Array.isArray(t)?t:Object.values(t).flat();}
