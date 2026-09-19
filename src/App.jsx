@@ -59,7 +59,26 @@ async function loadSpending(){const{data,error}=await supabase.from("spending").
 async function insertSpending(date,amount,label,category){const{data:{user}}=await supabase.auth.getUser();if(!user)return null;const{data,error}=await supabase.from("spending").insert({user_id:user.id,date,amount,label,category}).select().single();if(error)return null;return data;}
 async function loadTrackerLogs(){const{data,error}=await supabase.from("daily_tracker").select("*");if(error)return[];return data;}
 async function toggleTrackerHabit(userId,date,tab,habitId,currentDone){const newDone=!currentDone;await supabase.from("daily_tracker").upsert({user_id:userId,date,tab,habit_id:habitId,done:newDone},{onConflict:"user_id,date,tab,habit_id"});return newDone;}
-async function loadGymLogs(){const{data,error}=await supabase.from("gym_logs").select("*").order("date",{ascending:false});if(error)return[];return data.map(r=>({...r,exercises:JSON.parse(r.exercises||"[]")}));}
+async function loadGymLogs(){
+  const{data,error}=await supabase
+    .from("gym_logs")
+    .select("*")
+    .order("date",{ascending:false});
+
+  if(error){
+    console.error("Gym logs load error:", error);
+    return [];
+  }
+
+  console.log("Gym logs loaded:", data);
+
+  return data.map(r=>({
+    ...r,
+    exercises: typeof r.exercises === "string"
+      ? JSON.parse(r.exercises || "[]")
+      : (r.exercises || [])
+  }));
+}
 async function insertGymLog(date,exercises,note){const{data:{user}}=await supabase.auth.getUser();if(!user)return null;const{data,error}=await supabase.from("gym_logs").insert({user_id:user.id,date,exercises:JSON.stringify(exercises),note}).select().single();if(error)return null;return{...data,exercises:JSON.parse(data.exercises||"[]")};}
 async function updateGymLog(id,exercises,note){const{data,error}=await supabase.from("gym_logs").update({exercises:JSON.stringify(exercises),note}).eq("id",id).select().single();if(error)return null;return{...data,exercises:JSON.parse(data.exercises||"[]")};}
 
