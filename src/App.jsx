@@ -159,13 +159,13 @@ function TopNavBar({sessions,streak,todayMins,onMenuClick}){
 function Sidebar({open,onClose,page,setPage,sessions,onLogout,isDark,onToggleTheme,dailyStatus}){
   const T=useT();
   const items=[
-    {key:PAGES.GOALS,label:"Goals",icon:"🎯",ok:dailyStatus.goalsOk},
-    {key:PAGES.HABITS,label:"Habits",icon:"🔥",ok:dailyStatus.habitsOk},
-    {key:PAGES.GYM,label:"Gym",icon:"🏋️",ok:dailyStatus.gymOk},
-    {key:PAGES.SPENDING,label:"Spending",icon:"💸",ok:dailyStatus.spendingOk},
-    {key:PAGES.REFLECTION,label:"Reflect",icon:"💭",ok:dailyStatus.reflectOk},
-    {key:PAGES.SLEEP,label:"Sleep",icon:"🌙",ok:dailyStatus.sleepOk},
-  ];
+  {key:PAGES.HABITS,label:"Habits",icon:"🔥",ok:dailyStatus.habitsOk},
+  {key:PAGES.GYM,label:"Gym",icon:"🏋️",ok:dailyStatus.gymOk},
+  {key:PAGES.SPENDING,label:"Spending",icon:"💸",ok:dailyStatus.spendingOk},
+  {key:PAGES.REFLECTION,label:"Reflect",icon:"💭",ok:dailyStatus.reflectOk},
+  {key:PAGES.SLEEP,label:"Sleep",icon:"🌙",ok:dailyStatus.sleepOk},
+  {key:PAGES.GOALS,label:"Goals",icon:"🎯",ok:dailyStatus.goalsOk},
+];
   const now=nowIST();const ys=String(now.getFullYear());const mn=now.toLocaleDateString("en-US",{month:"short"});
   const yMins=sessions.filter(s=>s.date.startsWith(ys)).reduce((a,s)=>a+s.duration,0);
   const mp=`${ys}-${String(now.getMonth()+1).padStart(2,"0")}`;
