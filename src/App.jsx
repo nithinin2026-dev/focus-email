@@ -49,7 +49,17 @@ async function loadGoals(){const{data,error}=await supabase.from("goals").select
 async function insertGoal(name,tag,targetHours,startDate,targetDate){const{data:{user}}=await supabase.auth.getUser();if(!user)return null;const{data,error}=await supabase.from("goals").insert({user_id:user.id,name,tag,target_hours:targetHours,start_date:startDate,target_date:targetDate}).select().single();if(error)return null;return{id:data.id,name:data.name,tag:data.tag,targetHours:Number(data.target_hours),startDate:data.start_date,targetDate:data.target_date};}
 async function deleteGoalDB(id){await supabase.from("goals").delete().eq("id",id);}
 async function loadHabits(){const{data,error}=await supabase.from("habits").select("*").order("created_at",{ascending:true});if(error)return[];return data;}
-async function insertHabit(name,icon,startDate){const{data:{user}}=await supabase.auth.getUser();if(!user)return null;const{data,error}=await supabase.from("habits").insert({user_id:user.id,name,icon,start_date:startDate}).select().single();if(error)return null;return data;}
+async function insertHabit(name,icon,startDate){
+  const{data:{user},error:uErr}=await supabase.auth.getUser();
+  console.log("USER:",user,"uErr:",uErr);
+  if(!user)return null;
+  const{data,error}=await supabase.from("habits")
+    .insert({user_id:user.id,name,icon,start_date:startDate})
+    .select().single();
+  console.log("INSERT ERROR:",error,"DATA:",data);
+  if(error)return null;
+  return data;
+}
 async function deleteHabitDB(id){await supabase.from("habits").delete().eq("id",id);}
 async function loadHabitLogs(){const{data,error}=await supabase.from("habit_logs").select("*");if(error)return[];return data;}
 async function toggleHabitLog(habitId,date,exists){const{data:{user}}=await supabase.auth.getUser();if(!user)return null;if(exists){await supabase.from("habit_logs").delete().eq("habit_id",habitId).eq("date",date);return null;}const{data,error}=await supabase.from("habit_logs").insert({user_id:user.id,habit_id:habitId,date}).select().single();if(error)return null;return data;}
@@ -370,7 +380,7 @@ function HabitsPage({habits,setHabits,habitLogs,setHabitLogs}){
   const[nName,setNName]=useState("");const[nIcon,setNIcon]=useState("🎯");const[nStart,setNStart]=useState(todayStr());
   const[calHabit,setCalHabit]=useState("__all__");
   const[calMonth,setCalMonth]=useState(()=>{const d=nowIST();return{y:d.getFullYear(),m:d.getMonth()};});
-  const addHabit=async()=>{if(!nName.trim()||!nStart)return;const sv=await insertHabit(nName.trim(),nIcon,nStart);if(sv){setHabits(p=>[...p,sv]);setShowAdd(false);setNName("");setNIcon("🎯");setNStart(todayStr());}};
+  const addHabit=async()=>{console.log("CLICK",{nName,nIcon,nStart});if(!nName.trim()||!nStart)return;const sv=await insertHabit(nName.trim(),nIcon,nStart);console.log("RESULT:",sv);if(sv){setHabits(p=>[...p,sv]);setShowAdd(false);setNName("");setNIcon("🎯");setNStart(todayStr());}};
   const toggleToday=async(habitId)=>{const today=todayStr();const existing=habitLogs.find(l=>l.habit_id===habitId&&l.date===today);const result=await toggleHabitLog(habitId,today,!!existing);if(existing){setHabitLogs(p=>p.filter(l=>!(l.habit_id===habitId&&l.date===today)));}else if(result){setHabitLogs(p=>[...p,result]);}};
   const getHabitStats=(habit)=>{const logs=habitLogs.filter(l=>l.habit_id===habit.id);const logDates=new Set(logs.map(l=>l.date));const today=todayStr();const start=new Date(habit.start_date+"T12:00:00");const todayDate=new Date(today+"T12:00:00");const doneToday=logDates.has(today);let streak=0;const d=new Date(todayDate);if(doneToday){streak=1;d.setDate(d.getDate()-1);}else{d.setDate(d.getDate()-1);}while(d>=start){if(logDates.has(dateToStr(d))){streak++;d.setDate(d.getDate()-1);}else break;}let best=0,cur=0;const allDates=[...logDates].sort();for(let i=0;i<allDates.length;i++){if(i===0){cur=1;}else{const prev=new Date(allDates[i-1]+"T12:00:00");const curD=new Date(allDates[i]+"T12:00:00");if((curD-prev)===86400000)cur++;else cur=1;}if(cur>best)best=cur;}return{totalDone:logs.length,streak,best,doneToday,logDates};};
   const dateHabitMap={};habitLogs.forEach(l=>{if(!dateHabitMap[l.date])dateHabitMap[l.date]=new Set();dateHabitMap[l.date].add(l.habit_id);});
