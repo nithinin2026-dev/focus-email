@@ -756,7 +756,7 @@ function SleepPage({sleepLogs,setSleepLogs}){
 
 export default function App(){
   const[user,setUser]=useState(null);const[authLoading,setAuthLoading]=useState(true);
-  const[page,setPage]=useState(PAGES.GOALS);
+  const[page,setPage]=useState(PAGES.HABITS);
   const[sessions,setSessions]=useState([]);const[sleepLogs,setSleepLogs]=useState([]);
   const[goals,setGoals]=useState([]);const[habits,setHabits]=useState([]);const[habitLogs,setHabitLogs]=useState([]);
   const[reflections,setReflections]=useState({});const[trackerLogs,setTrackerLogs]=useState([]);
