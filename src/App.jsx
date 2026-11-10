@@ -51,12 +51,12 @@ async function deleteGoalDB(id){await supabase.from("goals").delete().eq("id",id
 async function loadHabits(){const{data,error}=await supabase.from("habits").select("*").order("created_at",{ascending:true});if(error)return[];return data;}
 async function insertHabit(name,icon,startDate){
   const{data:{user},error:uErr}=await supabase.auth.getUser();
-  console.log("USER:",user,"uErr:",uErr);
+   
   if(!user)return null;
   const{data,error}=await supabase.from("habits")
     .insert({user_id:user.id,name,icon,start_date:startDate})
     .select().single();
-  console.log("INSERT ERROR:",error,"DATA:",data);
+   
   if(error)return null;
   return data;
 }
@@ -67,8 +67,6 @@ async function loadSleepLogs(){const{data,error}=await supabase.from("sleep_logs
 async function upsertSleepLog(date,sleepStart,wakeUp,totalMins){const{data:{user}}=await supabase.auth.getUser();if(!user)return null;const{data,error}=await supabase.from("sleep_logs").upsert({user_id:user.id,date,sleep_start:sleepStart,wake_up:wakeUp,total_mins:totalMins},{onConflict:"user_id,date"}).select().single();if(error)return null;return data;}
 async function loadSpending(){const{data,error}=await supabase.from("spending").select("*").order("date",{ascending:false});if(error)return[];return data;}
 async function insertSpending(date,amount,label,category){const{data:{user}}=await supabase.auth.getUser();if(!user)return null;const{data,error}=await supabase.from("spending").insert({user_id:user.id,date,amount,label,category}).select().single();if(error)return null;return data;}
-async function loadTrackerLogs(){const{data,error}=await supabase.from("daily_tracker").select("*");if(error)return[];return data;}
-async function toggleTrackerHabit(userId,date,tab,habitId,currentDone){const newDone=!currentDone;await supabase.from("daily_tracker").upsert({user_id:userId,date,tab,habit_id:habitId,done:newDone},{onConflict:"user_id,date,tab,habit_id"});return newDone;}
 async function loadGymLogs(){
   const{data,error}=await supabase
     .from("gym_logs")
@@ -76,11 +74,11 @@ async function loadGymLogs(){
     .order("date",{ascending:false});
 
   if(error){
-    console.error("Gym logs load error:", error);
+     
     return [];
   }
 
-  console.log("Gym logs loaded:", data);
+   
 
   return data.map(r=>({
     ...r,
@@ -101,22 +99,9 @@ function formatHM(mins){const h=Math.floor(mins/60);const m=mins%60;if(h===0)ret
 function calcStreak(sessions){const dt={};sessions.forEach(s=>{dt[s.date]=(dt[s.date]||0)+s.duration;});let streak=0;const d=nowIST();const tk=todayStr();if((dt[tk]||0)>=120){streak=1;d.setDate(d.getDate()-1);}else{d.setDate(d.getDate()-1);}while(true){const k=dateToStr(d);if((dt[k]||0)>=120){streak++;d.setDate(d.getDate()-1);}else break;}return streak;}
 function getDayTotals(sessions){const t={};sessions.forEach(s=>{t[s.date]=(t[s.date]||0)+s.duration;});return t;}
 const F="'Nunito', sans-serif";
+ 
 
-const TRACKER_TABS={
-  cat:[
-    {id:"anki_flash",label:"2hr banking",emoji:"🃏"},
-    {id:"cat_quant_time",label:"2hr banking",emoji:"🔢"},
-    {id:"cat_lrdi_time",label:"Mock Test + analysis",emoji:"🧩"},
-    {id:"bank_reasoning",label:"2500+ Hardwork",emoji:"🧠"},
-  ],
-  personal:{
-    morning:[{id:"pills_am",label:"Pills (AM)",emoji:"💊"},{id:"cream_am",label:"Cream (AM)",emoji:"🧴"},{id:"kettle",label:"Kettle",emoji:"🫖"}],
-    evening:[{id:"pills_pm",label:"Pills (PM)",emoji:"💊"}],
-  },
-};
-function getAllTrackerHabits(tab){const t=TRACKER_TABS[tab];if(!t)return[];return Array.isArray(t)?t:Object.values(t).flat();}
-
-function useDailyStatus(sessions,habits,habitLogs,trackerLogs,reflections,sleepLogs,gymLogs){
+ function useDailyStatus(sessions,habits,habitLogs,reflections,sleepLogs,gymLogs){
   const today=todayStr();
   const habitsOk=habits.length>0&&habits.every(h=>habitLogs.some(l=>l.habit_id===h.id&&l.date===today));
   const gymOk=gymLogs.some(g=>g.date===today);
@@ -214,57 +199,9 @@ function AuthPage(){
   return(<div style={{maxWidth:400,margin:"0 auto",padding:"80px 24px",minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",fontFamily:F,background:T.bg}}><div style={{marginBottom:40,textAlign:"center"}}><div style={{fontSize:32,fontWeight:800,letterSpacing:"-0.02em",marginBottom:4,color:T.tx}}>Focus Maxing</div><div style={{fontSize:12,color:T.tx3,letterSpacing:"0.15em",fontWeight:600}}>Track your upskilling</div></div><div style={{width:"100%",maxWidth:320}}><div style={{display:"flex",marginBottom:32,borderBottom:`2px solid ${T.bd3}`}}>{["Login","Sign Up"].map((l,i)=>{const a=i===0?isLogin:!isLogin;return(<button key={l} onClick={()=>{setIsLogin(i===0);setError("");}} style={{flex:1,padding:"12px 0",border:"none",cursor:"pointer",background:a?T.btn:"transparent",color:a?T.btnT:T.tx,fontSize:12,fontWeight:700,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:F}}>{l}</button>);})}</div><input value={email} onChange={e=>setEmail(e.target.value)} placeholder="Email" type="email" autoComplete="email" onKeyDown={e=>e.key==="Enter"&&submit()} style={{...iStyle,marginBottom:12}}/><input value={pw} onChange={e=>setPw(e.target.value)} placeholder="Password" type="password" autoComplete={isLogin?"current-password":"new-password"} onKeyDown={e=>e.key==="Enter"&&submit()} style={{...iStyle,marginBottom:8}}/>{isLogin&&(<div style={{textAlign:"right",marginBottom:4}}><button onClick={forgot} style={{border:"none",background:"none",cursor:"pointer",fontSize:11,fontFamily:F,fontWeight:600,color:T.tx3,textDecoration:"underline",padding:0}}>Forgot Password?</button></div>)}{error&&(<div style={{fontSize:12,color:"#E63946",fontFamily:F,fontWeight:600,padding:"8px 0",textAlign:"center"}}>{error}</div>)}<button onClick={submit} disabled={loading} style={{width:"100%",padding:"14px 0",border:`2px solid ${T.bd3}`,background:T.btn,color:T.btnT,fontSize:13,fontFamily:F,fontWeight:700,cursor:loading?"default":"pointer",marginTop:16,opacity:loading?0.5:1}}>{loading?"...":isLogin?"Login":"Create Account"}</button></div><div style={{marginTop:60,fontSize:12,color:T.tx4,fontFamily:F,textAlign:"center"}}>Vibe coded by Nithin Chowdary ❤️</div></div>);
 }
 
-function TrackerSection({trackerLogs,setTrackerLogs,sessions,setSessions,reflections}){
-  const T=useT();const w=useWindowWidth();const mob=w<480;
-  const[activeTab,setActiveTab]=useState("cat");
-  const[userId,setUserId]=useState(null);
-  const[mTag,setMTag]=useState("");const[mMins,setMMins]=useState("");
-  useEffect(()=>{supabase.auth.getUser().then(({data:{user}})=>{if(user)setUserId(user.id);});},[]);
-  const today=todayStr();
-  const isDone=(tab,habitId)=>trackerLogs.some(l=>l.date===today&&l.tab===tab&&l.habit_id===habitId&&l.done);
-  const toggle=async(tab,habitId)=>{if(!userId)return;const current=isDone(tab,habitId);const newDone=await toggleTrackerHabit(userId,today,tab,habitId,current);setTrackerLogs(prev=>{const filtered=prev.filter(l=>!(l.date===today&&l.tab===tab&&l.habit_id===habitId));return[...filtered,{user_id:userId,date:today,tab,habit_id:habitId,done:newDone}];});};
-  const getStreak=(tab,habitId)=>{let s=0;const d=new Date(today+"T12:00:00");while(true){const key=dateToStr(d);const done=trackerLogs.some(l=>l.date===key&&l.tab===tab&&l.habit_id===habitId&&l.done);if(!done&&key===today){d.setDate(d.getDate()-1);continue;}if(!done)break;s++;d.setDate(d.getDate()-1);}return s;};
-  const getTabStreak=(tab)=>{const habits=getAllTrackerHabits(tab);let s=0;const d=new Date(today+"T12:00:00");while(true){const key=dateToStr(d);const allDone=habits.every(h=>trackerLogs.some(l=>l.date===key&&l.tab===tab&&l.habit_id===h.id&&l.done));if(!allDone&&key===today){d.setDate(d.getDate()-1);continue;}if(!allDone)break;s++;d.setDate(d.getDate()-1);}return s;};
-  const addSession=useCallback(async(ns)=>{setSessions(p=>[...p,ns]);const sv=await insertSession(ns);if(sv){setSessions(p=>p.map(s=>s.ts===ns.ts&&s.tag===ns.tag?{id:sv.id,tag:sv.tag,duration:sv.duration,date:sv.date,ts:Number(sv.ts)}:s));}},[setSessions]);
-  const logManual=()=>{const mins=parseInt(mMins);if(!mTag.trim()||isNaN(mins)||mins<=0)return;addSession({id:Date.now(),tag:mTag.trim(),duration:mins,date:today,ts:Date.now()});setMTag("");setMMins("");};
-  const todayMins=sessions.filter(s=>s.date===today).reduce((a,s)=>a+s.duration,0);
-  const renderHabits=(tab,habits)=>(<div>{habits.map(h=>{const done=isDone(tab,h.id);const streak=getStreak(tab,h.id);return(<div key={h.id} onClick={()=>toggle(tab,h.id)} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",marginBottom:5,borderRadius:8,background:done?"rgba(42,157,143,0.1)":T.bg3,border:`1px solid ${done?"#2A9D8F":T.bd}`,cursor:"pointer",userSelect:"none",fontFamily:F}}><div style={{width:18,height:18,borderRadius:"50%",border:`1.5px solid ${done?"#2A9D8F":T.tx4}`,background:done?"#2A9D8F":"transparent",display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,color:"#fff",flexShrink:0,fontWeight:700}}>{done&&"✓"}</div><span style={{fontSize:14}}>{h.emoji}</span><span style={{flex:1,fontSize:12,color:done?"#2A9D8F":T.tx2,fontWeight:600,textDecoration:done?"line-through":"none"}}>{h.label}</span>{streak>0&&<span style={{fontSize:11,fontWeight:700,color:"#ff6b35"}}>🔥{streak}</span>}</div>);})}</div>);
-  const tabs=["cat","personal"];const tabLabels={cat:"📚 LevelUp",personal:"🌿 Health"};
-  const habits=getAllTrackerHabits(activeTab);const doneTodayCount=habits.filter(h=>isDone(activeTab,h.id)).length;const tabStreak=getTabStreak(activeTab);const pct=Math.round((doneTodayCount/habits.length)*100);
-  const iStyle={border:`2px solid ${T.bd3}`,padding:"10px 14px",fontSize:14,fontFamily:F,background:"transparent",outline:"none",boxSizing:"border-box",color:T.tx};
-  return(
-    <div style={{background:T.bg2,borderRadius:10,padding:mob?14:18,border:`1px solid ${T.bd}`,fontFamily:F}}>
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10,flexWrap:"wrap",gap:8}}>
-        <div style={{fontSize:11,textTransform:"uppercase",letterSpacing:"0.15em",color:T.tx3,fontWeight:600}}>Daily Checklist</div>
-        <div style={{display:"flex",alignItems:"center",gap:8}}>
-          <span style={{fontSize:14,fontWeight:800,color:T.tx}}>{tabStreak>0?`${tabStreak} 🔥`:"0"}</span>
-          <span style={{fontSize:10,color:T.tx3}}>streak</span>
-          <span style={{fontSize:12,fontWeight:700,color:doneTodayCount===habits.length?"#2A9D8F":T.tx3}}>{doneTodayCount}/{habits.length}</span>
-        </div>
-      </div>
-      <div style={{height:3,background:T.bg3,borderRadius:2,overflow:"hidden",marginBottom:12}}>
-        <div style={{height:"100%",width:`${pct}%`,background:pct===100?"#2A9D8F":"#E63946",borderRadius:2,transition:"width 0.4s"}}/>
-      </div>
-      <div style={{display:"flex",background:T.bg3,borderRadius:6,overflow:"hidden",marginBottom:12,border:`1px solid ${T.bd}`}}>
-        {tabs.map(tab=>(<button key={tab} onClick={()=>setActiveTab(tab)} style={{flex:1,padding:"8px 6px",border:"none",background:activeTab===tab?T.btn:"transparent",color:activeTab===tab?T.btnT:T.tx3,fontFamily:F,fontSize:11,fontWeight:700,cursor:"pointer"}}>{tabLabels[tab]}</button>))}
-      </div>
-      {activeTab==="cat"&&renderHabits("cat",TRACKER_TABS.cat)}
-      {activeTab==="personal"&&(<><div style={{fontSize:9,color:T.tx3,letterSpacing:3,textTransform:"uppercase",marginBottom:6,fontWeight:600}}>☀️ Morning</div>{renderHabits("personal",TRACKER_TABS.personal.morning)}<div style={{fontSize:9,color:T.tx3,letterSpacing:3,textTransform:"uppercase",margin:"10px 0 6px",fontWeight:600}}>🌙 Evening</div>{renderHabits("personal",TRACKER_TABS.personal.evening)}</>)}
-      <div style={{borderTop:`1px solid ${T.bd}`,marginTop:14,paddingTop:14}}>
-        <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
-          <input value={mTag} onChange={e=>setMTag(e.target.value)} placeholder="Study tag" style={{...iStyle,flex:1,minWidth:100,padding:"8px 12px",fontSize:13}} onKeyDown={e=>e.key==="Enter"&&logManual()}/>
-          <input value={mMins} onChange={e=>setMMins(e.target.value)} placeholder="mins" type="number" style={{...iStyle,width:72,padding:"8px 10px",fontSize:13}} onKeyDown={e=>e.key==="Enter"&&logManual()}/>
-          <button onClick={logManual} style={{padding:"9px 18px",border:`2px solid ${T.bd3}`,background:T.btn,color:T.btnT,fontSize:13,fontFamily:F,fontWeight:700,cursor:"pointer"}}>+</button>
-          {todayMins>0&&<span style={{fontSize:12,fontWeight:700,color:todayMins>=120?"#2A9D8F":"#E63946"}}>{formatHM(todayMins)} {todayMins>=120?"🔥":""}</span>}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 async function exportToExcel(sessions,reflections){const XLSX=await import("xlsx");const dm={};sessions.forEach(s=>{dm[s.date]=(dm[s.date]||0)+s.duration;});const dd=Object.entries(dm).sort((a,b)=>a[0].localeCompare(b[0])).map(([date,mins])=>({Date:date,Day:new Date(date+"T12:00:00").toLocaleDateString("en-US",{weekday:"long"}),Hours:+(mins/60).toFixed(2),Status:mins>=120?"🔥":"❌",Reflection:reflections[date]?.note||""}));const wm={};Object.entries(dm).forEach(([date,mins])=>{const d=new Date(date+"T12:00:00");const m=new Date(d);m.setDate(d.getDate()-((d.getDay()+6)%7));const s=new Date(m);s.setDate(m.getDate()+6);const l=`${m.toLocaleDateString("en-US",{month:"short",day:"numeric"})} - ${s.toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}`;wm[l]=(wm[l]||0)+mins;});const wd=Object.entries(wm).map(([w,m])=>({Week:w,Hours:+(m/60).toFixed(2)}));const mm={};Object.entries(dm).forEach(([date,mins])=>{const k=date.slice(0,7);mm[k]=(mm[k]||0)+mins;});const md=Object.entries(mm).sort((a,b)=>a[0].localeCompare(b[0])).map(([k,m])=>{const[y,mo]=k.split("-");return{Month:new Date(parseInt(y),parseInt(mo)-1).toLocaleDateString("en-US",{month:"long",year:"numeric"}),Hours:+(m/60).toFixed(2)};});const tm={};const tf={};sessions.forEach(s=>{tm[s.tag]=(tm[s.tag]||0)+s.duration;if(!tf[s.tag]||s.date<tf[s.tag])tf[s.tag]=s.date;});const td=Object.entries(tm).sort((a,b)=>b[1]-a[1]).map(([t,m])=>({Topic:t,Hours:+(m/60).toFixed(2),Started:tf[t]||""}));const rd=Object.entries(reflections||{}).filter(([,r])=>r.note).sort((a,b)=>b[0].localeCompare(a[0])).map(([date,r])=>({Date:date,Day:new Date(date+"T12:00:00").toLocaleDateString("en-US",{weekday:"long"}),Hours:r.hrsOverride!=null?+r.hrsOverride.toFixed(2):+((dm[date]||0)/60).toFixed(2),Reflection:r.note}));const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(dd),"Day-wise");XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(wd),"Week-wise");XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(md),"Month-wise");XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(td),"Topic-wise");XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rd),"Reflections");XLSX.writeFile(wb,`FocusMaxing_Export_${todayStr()}.xlsx`);}
 
-function GoalsPage({sessions,setSessions,goals,setGoals,trackerLogs,setTrackerLogs,reflections}){
+ function GoalsPage({sessions,setSessions,goals,setGoals,reflections}){
   const T=useT();const w=useWindowWidth();const mob=w<480;
   const[selId,setSelId]=useState(()=>localStorage.getItem("fm_selectedGoal")||"");
   const[showAdd,setShowAdd]=useState(false);
@@ -375,7 +312,7 @@ function HabitsPage({habits,setHabits,habitLogs,setHabitLogs}){
   const[nName,setNName]=useState("");const[nIcon,setNIcon]=useState("🎯");const[nStart,setNStart]=useState(todayStr());
   const[calHabit,setCalHabit]=useState("__all__");
   const[calMonth,setCalMonth]=useState(()=>{const d=nowIST();return{y:d.getFullYear(),m:d.getMonth()};});
-  const addHabit=async()=>{console.log("CLICK",{nName,nIcon,nStart});if(!nName.trim()||!nStart)return;const sv=await insertHabit(nName.trim(),nIcon,nStart);console.log("RESULT:",sv);if(sv){setHabits(p=>[...p,sv]);setShowAdd(false);setNName("");setNIcon("🎯");setNStart(todayStr());}};
+  const addHabit=async()=>{if(!nName.trim()||!nStart)return;const sv=await insertHabit(nName.trim(),nIcon,nStart); if(sv){setHabits(p=>[...p,sv]);setShowAdd(false);setNName("");setNIcon("🎯");setNStart(todayStr());}};
   const toggleToday=async(habitId)=>{const today=todayStr();const existing=habitLogs.find(l=>l.habit_id===habitId&&l.date===today);const result=await toggleHabitLog(habitId,today,!!existing);if(existing){setHabitLogs(p=>p.filter(l=>!(l.habit_id===habitId&&l.date===today)));}else if(result){setHabitLogs(p=>[...p,result]);}};
   const getHabitStats=(habit)=>{const logs=habitLogs.filter(l=>l.habit_id===habit.id);const logDates=new Set(logs.map(l=>l.date));const today=todayStr();const start=new Date(habit.start_date+"T12:00:00");const todayDate=new Date(today+"T12:00:00");const doneToday=logDates.has(today);let streak=0;const d=new Date(todayDate);if(doneToday){streak=1;d.setDate(d.getDate()-1);}else{d.setDate(d.getDate()-1);}while(d>=start){if(logDates.has(dateToStr(d))){streak++;d.setDate(d.getDate()-1);}else break;}let best=0,cur=0;const allDates=[...logDates].sort();for(let i=0;i<allDates.length;i++){if(i===0){cur=1;}else{const prev=new Date(allDates[i-1]+"T12:00:00");const curD=new Date(allDates[i]+"T12:00:00");if((curD-prev)===86400000)cur++;else cur=1;}if(cur>best)best=cur;}return{totalDone:logs.length,streak,best,doneToday,logDates};};
   const dateHabitMap={};habitLogs.forEach(l=>{if(!dateHabitMap[l.date])dateHabitMap[l.date]=new Set();dateHabitMap[l.date].add(l.habit_id);});
@@ -754,7 +691,7 @@ export default function App(){
   const[page,setPage]=useState(PAGES.HABITS);
   const[sessions,setSessions]=useState([]);const[sleepLogs,setSleepLogs]=useState([]);
   const[goals,setGoals]=useState([]);const[habits,setHabits]=useState([]);const[habitLogs,setHabitLogs]=useState([]);
-  const[reflections,setReflections]=useState({});const[trackerLogs,setTrackerLogs]=useState([]);
+  const[reflections,setReflections]=useState({});
   const[gymLogs,setGymLogs]=useState([]);
   const[loaded,setLoaded]=useState(false);const[sidebarOpen,setSidebarOpen]=useState(false);
   const[isDark,setIsDark]=useState(()=>localStorage.getItem("fm_theme")==="dark");
@@ -764,15 +701,15 @@ export default function App(){
   if(typeof document!=="undefined"){document.body.style.background=(localStorage.getItem("fm_theme")==="dark"?"#000":"#fff");document.documentElement.style.background=(localStorage.getItem("fm_theme")==="dark"?"#000":"#fff");}
   useEffect(()=>{supabase.auth.getSession().then(({data:{session}})=>{setUser(session?.user??null);setAuthLoading(false);});const{data:{subscription}}=supabase.auth.onAuthStateChange((_e,session)=>{setUser(session?.user??null);});return()=>subscription.unsubscribe();},[]);
   useEffect(()=>{
-    if(!user){setSessions([]);setSleepLogs([]);setGoals([]);setHabits([]);setHabitLogs([]);setTrackerLogs([]);setGymLogs([]);setLoaded(false);return;}
+     if(!user){setSessions([]);setSleepLogs([]);setGoals([]);setHabits([]);setHabitLogs([]);setGymLogs([]);setLoaded(false);return;}
     setLoaded(false);
-    Promise.all([loadSessions(),loadSleepLogs(),loadGoals(),loadHabits(),loadHabitLogs(),loadReflections(),loadTrackerLogs(),loadGymLogs()])
-      .then(([s,sl,g,h,hl,ref,tl,gl])=>{setSessions(s);setSleepLogs(sl);setGoals(g);setHabits(h);setHabitLogs(hl);setReflections(ref);setTrackerLogs(tl);setGymLogs(gl);setLoaded(true);});
+     Promise.all([loadSessions(),loadSleepLogs(),loadGoals(),loadHabits(),loadHabitLogs(),loadReflections(),loadGymLogs()])
+      .then(([s,sl,g,h,hl,ref,gl])=>{setSessions(s);setSleepLogs(sl);setGoals(g);setHabits(h);setHabitLogs(hl);setReflections(ref);setGymLogs(gl);setLoaded(true);});
   },[user]);
-  const handleLogout=async()=>{await supabase.auth.signOut();setUser(null);setSessions([]);setSleepLogs([]);setGoals([]);setHabits([]);setHabitLogs([]);setTrackerLogs([]);setGymLogs([]);setLoaded(false);setSidebarOpen(false);};
+   const handleLogout=async()=>{await supabase.auth.signOut();setUser(null);setSessions([]);setSleepLogs([]);setGoals([]);setHabits([]);setHabitLogs([]);setGymLogs([]);setLoaded(false);setSidebarOpen(false);};
   const streak=calcStreak(sessions);
   const todayMins=sessions.filter(s=>s.date===todayStr()).reduce((a,s)=>a+s.duration,0);
-  const dailyStatus=useDailyStatus(sessions,habits,habitLogs,trackerLogs,reflections,sleepLogs,gymLogs);
+   const dailyStatus=useDailyStatus(sessions,habits,habitLogs,reflections,sleepLogs,gymLogs);
   const getMaxWidth=()=>{if(page===PAGES.GOALS||page===PAGES.HABITS)return w<480?"100%":640;return w<480?"100%":540;};
   const fontLink=<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>;
   if(authLoading)return(<ThemeContext.Provider value={theme}><div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100vh",fontFamily:F,fontSize:14,color:theme.tx3,background:theme.bg}}>{fontLink}Loading...</div></ThemeContext.Provider>);
@@ -784,7 +721,7 @@ export default function App(){
         {fontLink}
         <TopNavBar sessions={sessions} streak={streak} todayMins={todayMins} onMenuClick={()=>setSidebarOpen(true)}/>
         <Sidebar open={sidebarOpen} onClose={()=>setSidebarOpen(false)} page={page} setPage={setPage} sessions={sessions} onLogout={handleLogout} isDark={isDark} onToggleTheme={toggleTheme} dailyStatus={dailyStatus}/>
-        {page===PAGES.GOALS&&<div style={{paddingTop:16}}><GoalsPage sessions={sessions} setSessions={setSessions} goals={goals} setGoals={setGoals} trackerLogs={trackerLogs} setTrackerLogs={setTrackerLogs} reflections={reflections}/></div>}
+         {page===PAGES.GOALS&&<div style={{paddingTop:16}}><GoalsPage sessions={sessions} setSessions={setSessions} goals={goals} setGoals={setGoals} reflections={reflections}/></div>}
         {page===PAGES.HABITS&&<div style={{paddingTop:16}}><HabitsPage habits={habits} setHabits={setHabits} habitLogs={habitLogs} setHabitLogs={setHabitLogs}/></div>}
         {page===PAGES.GYM&&<div style={{paddingTop:16}}><GymPage gymLogs={gymLogs} setGymLogs={setGymLogs}/></div>}
         {page===PAGES.SPENDING&&<div style={{paddingTop:16}}><SpendingPage/></div>}
