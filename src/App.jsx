@@ -96,7 +96,7 @@ function todayStr(){return dateToStr(toIST(new Date()));}
 function nowIST(){return toIST(new Date());}
 function formatTime(s){const m=Math.floor(s/60);const sec=s%60;return`${String(m).padStart(2,"0")}:${String(sec).padStart(2,"0")}`;}
 function formatHM(mins){const h=Math.floor(mins/60);const m=mins%60;if(h===0)return`${m}m`;if(m===0)return`${h}h`;return`${h}h ${m}m`;}
-function calcStreak(sessions){const dt={};sessions.forEach(s=>{dt[s.date]=(dt[s.date]||0)+s.duration;});let streak=0;const d=nowIST();const tk=todayStr();if((dt[tk]||0)>=120){streak=1;d.setDate(d.getDate()-1);}else{d.setDate(d.getDate()-1);}while(true){const k=dateToStr(d);if((dt[k]||0)>=120){streak++;d.setDate(d.getDate()-1);}else break;}return streak;}
+ 
 function getDayTotals(sessions){const t={};sessions.forEach(s=>{t[s.date]=(t[s.date]||0)+s.duration;});return t;}
 const F="'Nunito', sans-serif";
  
@@ -116,10 +116,10 @@ function ThemeToggle({isDark,onToggle}){
   return(<div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 4px",fontFamily:F}}><span style={{fontSize:12,fontWeight:600,color:isDark?"#aaa":"#666"}}>{isDark?"🌙 Dark":"☀️ Light"}</span><button onClick={onToggle} style={{width:44,height:24,borderRadius:12,border:"none",background:isDark?"#fff":"#000",position:"relative",cursor:"pointer",transition:"background 0.3s ease"}}><div style={{width:18,height:18,borderRadius:"50%",background:isDark?"#000":"#fff",position:"absolute",top:3,left:isDark?22:4,transition:"left 0.3s ease",boxShadow:"0 1px 3px rgba(0,0,0,0.2)"}}/></button></div>);
 }
 
-function TopNavBar({sessions,streak,todayMins,onMenuClick}){
+function TopNavBar({sessions,streak,onMenuClick}){
   const T=useT();const[visible,setVisible]=useState(true);const lastY=useRef(0);const w=useWindowWidth();const mob=w<480;
   useEffect(()=>{const h=()=>{const y=window.scrollY;if(y>lastY.current&&y>60)setVisible(false);else setVisible(true);lastY.current=y;};window.addEventListener("scroll",h,{passive:true});return()=>window.removeEventListener("scroll",h);},[]);
-  const dt=getDayTotals(sessions);const mx=Object.values(dt).length>0?Math.max(...Object.values(dt)):0;const hit=todayMins>=120;
+   const dt=getDayTotals(sessions);const mx=Object.values(dt).length>0?Math.max(...Object.values(dt)):0;
   return(
     <div style={{position:"fixed",top:0,left:0,right:0,zIndex:1000,background:T.nav,borderBottom:`1px solid ${T.bd}`,transform:visible?"translateY(0)":"translateY(-100%)",transition:"transform 0.35s ease",padding:mob?"8px 10px":"10px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",fontFamily:F,boxShadow:visible?T.navSh:"none"}}>
       <div style={{display:"flex",alignItems:"center",gap:mob?6:10}}>
@@ -129,11 +129,11 @@ function TopNavBar({sessions,streak,todayMins,onMenuClick}){
         <span style={{fontSize:mob?11:13,fontWeight:700,display:"flex",alignItems:"center",gap:4,color:T.tx}}><span>⚡</span><span>{formatHM(mx)}</span><span style={{fontWeight:400,fontSize:mob?8:10,color:T.tx3}}>max</span></span>
       </div>
       {!mob&&(<div style={{flex:1,textAlign:"center",fontSize:13,fontWeight:700,color:T.tx2,fontStyle:"italic",padding:"0 12px"}}>"Flow State is Fragile"</div>)}
-      <div style={{display:"flex",alignItems:"center",gap:5,background:hit?(streak>0?T.btn:T.bg3):"#E63946",color:hit?(streak>0?T.btnT:T.tx3):"#fff",padding:mob?"5px 10px":"6px 14px",borderRadius:30,fontSize:mob?12:13,fontWeight:700}}>
-        <span style={{fontSize:mob?14:16}}>{hit?(streak>0?"🔥":"○"):"⚠️"}</span>
-        <span>{streak}</span>
-        <span style={{fontWeight:400,fontSize:mob?8:10,opacity:0.8}}>{hit?(streak===1?"day":"days"):"do 2h+"}</span>
-      </div>
+      <div style={{display:"flex",alignItems:"center",gap:5,background:streak>0?T.btn:T.bg3,color:streak>0?T.btnT:T.tx3,padding:mob?"5px 10px":"6px 14px",borderRadius:30,fontSize:mob?12:13,fontWeight:700}}>
+      <span style={{fontSize:mob?14:16}}>{streak>0?"🔥":"○"}</span>
+      <span>{streak}</span>
+      <span style={{fontWeight:400,fontSize:mob?8:10,opacity:0.8}}>{streak===1?"day":"days"}</span>
+    </div>
     </div>
   );
 }
@@ -707,8 +707,27 @@ export default function App(){
       .then(([s,sl,g,h,hl,ref,gl])=>{setSessions(s);setSleepLogs(sl);setGoals(g);setHabits(h);setHabitLogs(hl);setReflections(ref);setGymLogs(gl);setLoaded(true);});
   },[user]);
    const handleLogout=async()=>{await supabase.auth.signOut();setUser(null);setSessions([]);setSleepLogs([]);setGoals([]);setHabits([]);setHabitLogs([]);setGymLogs([]);setLoaded(false);setSidebarOpen(false);};
-  const streak=calcStreak(sessions);
-  const todayMins=sessions.filter(s=>s.date===todayStr()).reduce((a,s)=>a+s.duration,0);
+   const streak=(()=>{
+  if(habits.length===0)return 0;
+  const doneByDate={};
+  habitLogs.forEach(l=>{if(!doneByDate[l.date])doneByDate[l.date]=new Set();doneByDate[l.date].add(l.habit_id);});
+  const activeOn=d=>habits.filter(h=>h.start_date<=d);
+  let s=0;
+  const d=new Date(todayStr()+"T12:00:00");
+  const tk=dateToStr(d);
+  const tActive=activeOn(tk);
+  const tDone=doneByDate[tk]||new Set();
+  if(!(tActive.length>0&&tActive.every(h=>tDone.has(h.id))))d.setDate(d.getDate()-1);
+  const earliest=habits.reduce((a,h)=>h.start_date<a?h.start_date:a,habits[0].start_date);
+  const earliestD=new Date(earliest+"T12:00:00");
+  while(d>=earliestD){
+    const k=dateToStr(d);
+    const active=activeOn(k);
+    const done=doneByDate[k]||new Set();
+    if(active.length>0&&active.every(h=>done.has(h.id))){s++;d.setDate(d.getDate()-1);}else break;
+  }
+  return s;
+})(); 
    const dailyStatus=useDailyStatus(sessions,habits,habitLogs,reflections,sleepLogs,gymLogs);
   const getMaxWidth=()=>{if(page===PAGES.GOALS||page===PAGES.HABITS)return w<480?"100%":640;return w<480?"100%":540;};
   const fontLink=<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>;
@@ -719,7 +738,7 @@ export default function App(){
     <ThemeContext.Provider value={theme}>
       <div style={{maxWidth:getMaxWidth(),margin:"0 auto",padding:w<480?"56px 12px 60px":"60px 20px 60px",minHeight:"100vh",background:theme.bg,color:theme.tx,transition:"background 0.3s ease, color 0.3s ease"}}>
         {fontLink}
-        <TopNavBar sessions={sessions} streak={streak} todayMins={todayMins} onMenuClick={()=>setSidebarOpen(true)}/>
+        <TopNavBar sessions={sessions} streak={streak} onMenuClick={()=>setSidebarOpen(true)}/>
         <Sidebar open={sidebarOpen} onClose={()=>setSidebarOpen(false)} page={page} setPage={setPage} sessions={sessions} onLogout={handleLogout} isDark={isDark} onToggleTheme={toggleTheme} dailyStatus={dailyStatus}/>
          {page===PAGES.GOALS&&<div style={{paddingTop:16}}><GoalsPage sessions={sessions} setSessions={setSessions} goals={goals} setGoals={setGoals} reflections={reflections}/></div>}
         {page===PAGES.HABITS&&<div style={{paddingTop:16}}><HabitsPage habits={habits} setHabits={setHabits} habitLogs={habitLogs} setHabitLogs={setHabitLogs}/></div>}
