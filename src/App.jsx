@@ -118,13 +118,10 @@ function getAllTrackerHabits(tab){const t=TRACKER_TABS[tab];if(!t)return[];retur
 
 function useDailyStatus(sessions,habits,habitLogs,trackerLogs,reflections,sleepLogs,gymLogs){
   const today=todayStr();
-  const todayMins=sessions.filter(s=>s.date===today).reduce((a,s)=>a+s.duration,0);
-  const checklistHabits=getAllTrackerHabits("cat");
-  const checklistDone=checklistHabits.every(h=>trackerLogs.some(l=>l.date===today&&l.tab==="cat"&&l.habit_id===h.id&&l.done));
-  const goalsOk=checklistDone&&todayMins>=120;
   const habitsOk=habits.length>0&&habits.every(h=>habitLogs.some(l=>l.habit_id===h.id&&l.date===today));
   const gymOk=gymLogs.some(g=>g.date===today);
   const spendingOk=true;
+  const goalsOk=true;  
   const reflectOk=!!(reflections[today]&&reflections[today].note&&reflections[today].note.trim());
   const sleepOk=sleepLogs.length>0;
   return{goalsOk,habitsOk,gymOk,spendingOk,reflectOk,sleepOk};
@@ -303,9 +300,7 @@ function GoalsPage({sessions,setSessions,goals,setGoals,trackerLogs,setTrackerLo
   const iStyle={border:`2px solid ${T.bd3}`,padding:"10px 14px",fontSize:14,fontFamily:F,background:"transparent",outline:"none",boxSizing:"border-box",color:T.tx};
   const selStyle={border:`2px solid ${T.bd3}`,padding:"10px 14px",fontSize:14,fontFamily:F,fontWeight:700,background:T.sel,color:T.tx,outline:"none",cursor:"pointer",borderRadius:4,boxSizing:"border-box"};
   return(
-    <div style={{fontFamily:F}}>
-      <TrackerSection trackerLogs={trackerLogs} setTrackerLogs={setTrackerLogs} sessions={sessions} setSessions={setSessions} reflections={reflections}/>
-      <div style={{height:32}}/>
+    <div style={{fontFamily:F}}> 
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20,gap:10,flexWrap:"wrap"}}>
         <div style={{fontSize:11,textTransform:"uppercase",letterSpacing:"0.15em",color:T.tx3,fontWeight:600}}>🎯 Goals</div>
         <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
