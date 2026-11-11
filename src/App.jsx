@@ -729,26 +729,27 @@ function SleepPage({sleepLogs,setSleepLogs}){
   );
 }
 
-function NotesPage({notes,setNotes}){
+ function NotesPage({notes,setNotes}){
   const T=useT();const w=useWindowWidth();const mob=w<480;
-  const[editing,setEditing]=useState(null);
+  const[editing,setEditing]=useState(null);       // null | "new" | id
   const[title,setTitle]=useState("");
   const[content,setContent]=useState("");
   const[items,setItems]=useState([]);
   const[type,setType]=useState("text");
-  const[expires,setExpires]=useState("");
   const[newItem,setNewItem]=useState("");
 
-  const today=todayStr();
-  const expired=date=>date&&date<today;
-
-  const openNew=()=>{setEditing("new");setTitle("");setContent("");setItems([]);setType("text");setExpires("");setNewItem("");};
-  const openEdit=(n)=>{setEditing(n.id);setTitle(n.title||"");setContent(n.content||"");setItems(n.items||[]);setType(n.type||"text");setExpires(n.expires_at||"");setNewItem("");};
+  const openNew=(initialType="text")=>{
+    setEditing("new");setTitle("");setContent("");setItems([]);
+    setType(initialType);setNewItem("");
+  };
+  const openEdit=(n)=>{
+    setEditing(n.id);setTitle(n.title||"");setContent(n.content||"");
+    setItems(n.items||[]);setType(n.type||"text");setNewItem("");
+  };
   const close=()=>setEditing(null);
 
   const save=async()=>{
-    if(!title.trim()&&!content.trim()&&items.length===0)return;
-    const payload={title:title.trim(),content,items:items.filter(i=>i.text.trim()),type,expires_at:expires||null};
+    const payload={title:title.trim(),content,items:items.filter(i=>i.text.trim()),type};
     if(editing==="new"){
       const sv=await insertNote(payload);
       if(sv)setNotes(p=>[{...sv,items:sv.items||[]},...p]);
@@ -773,84 +774,82 @@ function NotesPage({notes,setNotes}){
     if(sv)setNotes(p=>p.map(x=>x.id===n.id?{...x,items:newItems}:x));
   };
 
-  const sorted=[...notes].sort((a,b)=>{
-    const aExp=expired(a.expires_at)?1:0,bExp=expired(b.expires_at)?1:0;
-    if(aExp!==bExp)return aExp-bExp;
-    if(a.expires_at&&b.expires_at&&a.expires_at!==b.expires_at)return a.expires_at.localeCompare(b.expires_at);
-    return(b.created_at||"").localeCompare(a.created_at||"");
-  });
+  const sorted=[...notes].sort((a,b)=>(b.created_at||"").localeCompare(a.created_at||""));
 
   const iStyle={border:`2px solid ${T.bd3}`,padding:"8px 12px",fontSize:13,fontFamily:F,background:"transparent",outline:"none",boxSizing:"border-box",color:T.tx,borderRadius:6};
 
-  return(
-    <div style={{fontFamily:F}}>
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20,gap:10,flexWrap:"wrap"}}>
-        <div style={{fontSize:11,textTransform:"uppercase",letterSpacing:"0.15em",color:T.tx3,fontWeight:600}}>📝 Notes</div>
-        {editing===null&&<button onClick={openNew} style={{padding:"10px 18px",border:`2px solid ${T.bd3}`,background:T.btn,color:T.btnT,fontSize:12,fontFamily:F,fontWeight:700,cursor:"pointer"}}>+ New Note</button>}
-      </div>
+  // ───── EDITOR FULLSCREEN ─────
+  if(editing!==null){
+    return(
+      <div style={{position:"fixed",inset:0,zIndex:3000,background:T.bg,display:"flex",flexDirection:"column",fontFamily:F}}>
+        {/* top bar */}
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:mob?"10px 12px":"12px 20px",borderBottom:`1px solid ${T.bd}`,flexShrink:0}}>
+          <button onClick={close} style={{border:"none",background:"none",cursor:"pointer",fontSize:22,color:T.tx3,padding:4,lineHeight:1}}>←</button>
+          <button onClick={save} style={{padding:"6px 16px",border:`2px solid ${T.bd3}`,background:T.btn,color:T.btnT,fontSize:12,fontWeight:700,cursor:"pointer",borderRadius:6}}>Save</button>
+        </div>
 
-      {editing!==null&&(
-        <div style={{background:T.bg2,borderRadius:10,padding:mob?14:20,marginBottom:24,border:`1px solid ${T.bd}`}}>
-          <div style={{display:"flex",gap:8,marginBottom:12}}>
-            {["text","checklist"].map(t=>(
-              <button key={t} onClick={()=>setType(t)} style={{padding:"6px 14px",border:`2px solid ${type===t?T.bd3:T.bd2}`,background:type===t?T.btn:"transparent",color:type===t?T.btnT:T.tx3,fontFamily:F,fontSize:12,fontWeight:700,cursor:"pointer",borderRadius:6}}>
-                {t==="text"?"📄 Text":"☑ Checklist"}
-              </button>
-            ))}
-          </div>
-          <input value={title} onChange={e=>setTitle(e.target.value)} placeholder="Title" style={{...iStyle,width:"100%",marginBottom:10,fontSize:15,fontWeight:700}}/>
+        {/* title + content */}
+        <div style={{flex:1,overflowY:"auto",padding:mob?"12px":"20px 40px",maxWidth:800,margin:"0 auto",width:"100%",boxSizing:"border-box"}}>
+          <input value={title} onChange={e=>setTitle(e.target.value)} placeholder="Title" style={{width:"100%",border:"none",background:"transparent",outline:"none",fontSize:mob?22:28,fontWeight:800,fontFamily:F,color:T.tx,padding:"8px 0",marginBottom:12}}/>
           {type==="text"?(
-            <textarea value={content} onChange={e=>setContent(e.target.value)} placeholder="Write something..." rows={6} style={{...iStyle,width:"100%",resize:"vertical",marginBottom:10,lineHeight:1.5}}/>
+            <textarea value={content} onChange={e=>setContent(e.target.value)} placeholder="Write something..." style={{width:"100%",minHeight:"50vh",border:"none",background:"transparent",outline:"none",fontSize:mob?16:17,fontFamily:F,color:T.tx,resize:"none",lineHeight:1.6,padding:0}}/>
           ):(
-            <div style={{marginBottom:10}}>
+            <div>
               {items.map((it,i)=>(
-                <div key={i} style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
-                  <input type="checkbox" checked={it.done} onChange={()=>toggleItem(i)} style={{width:16,height:16,cursor:"pointer"}}/>
-                  <span style={{flex:1,fontSize:14,textDecoration:it.done?"line-through":"none",color:it.done?T.tx3:T.tx}}>{it.text}</span>
+                <div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0"}}>
+                  <input type="checkbox" checked={it.done} onChange={()=>toggleItem(i)} style={{width:18,height:18,cursor:"pointer",flexShrink:0}}/>
+                  <span style={{flex:1,fontSize:mob?15:16,textDecoration:it.done?"line-through":"none",color:it.done?T.tx3:T.tx}}>{it.text}</span>
                   <button onClick={()=>removeItem(i)} style={{border:"none",background:"none",cursor:"pointer",color:T.tx4,fontSize:14,padding:0}}>✕</button>
                 </div>
               ))}
-              <div style={{display:"flex",gap:6,marginTop:8}}>
-                <input value={newItem} onChange={e=>setNewItem(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addItem()} placeholder="Add item..." style={{...iStyle,flex:1}}/>
-                <button onClick={addItem} style={{padding:"6px 14px",border:`2px solid ${T.bd3}`,background:T.btn,color:T.btnT,fontSize:12,fontWeight:700,cursor:"pointer",borderRadius:6}}>+</button>
+              <div style={{display:"flex",alignItems:"center",gap:8,padding:"8px 0"}}>
+                <input type="checkbox" disabled style={{width:18,height:18,opacity:0.4}}/>
+                <input value={newItem} onChange={e=>setNewItem(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addItem()} placeholder="Add item..." style={{flex:1,border:"none",background:"transparent",outline:"none",fontSize:mob?15:16,fontFamily:F,color:T.tx,padding:0}}/>
               </div>
             </div>
           )}
-          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12,flexWrap:"wrap"}}>
-            <label style={{fontSize:11,color:T.tx3,fontWeight:600}}>EXPIRES:</label>
-            <input type="date" value={expires} onChange={e=>setExpires(e.target.value)} style={{...iStyle,width:160}}/>
-            {expires&&<button onClick={()=>setExpires("")} style={{border:"none",background:"none",cursor:"pointer",fontSize:11,color:T.tx3,textDecoration:"underline",padding:0}}>clear</button>}
-          </div>
-          <div style={{display:"flex",gap:8}}>
-            <button onClick={save} style={{padding:"9px 20px",border:`2px solid ${T.bd3}`,background:T.btn,color:T.btnT,fontSize:12,fontFamily:F,fontWeight:700,cursor:"pointer",borderRadius:6}}>Save</button>
-            <button onClick={close} style={{padding:"9px 16px",border:`2px solid ${T.bd2}`,background:"transparent",color:T.tx3,fontSize:12,fontFamily:F,cursor:"pointer",borderRadius:6}}>Cancel</button>
-          </div>
         </div>
-      )}
 
-      {notes.length===0&&editing===null&&(
+        {/* bottom bar: checklist toggle on left */}
+        <div style={{borderTop:`1px solid ${T.bd}`,padding:mob?"8px 12px":"10px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0}}>
+          <button
+            onClick={()=>setType(t=>t==="checklist"?"text":"checklist")}
+            style={{border:"none",background:"none",cursor:"pointer",fontSize:22,padding:6,color:type==="checklist"?"#2A9D8F":T.tx3,lineHeight:1}}
+            title={type==="checklist"?"Switch to text":"Switch to checklist"}
+          >
+            ☑
+          </button>
+          <span style={{fontSize:10,color:T.tx4}}>{type==="checklist"?"checklist":"text"}</span>
+        </div>
+      </div>
+    );
+  }
+
+  // ───── LIST VIEW ─────
+  return(
+    <div style={{fontFamily:F,paddingBottom:80,position:"relative",minHeight:"60vh"}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20,gap:10,flexWrap:"wrap"}}>
+        <div style={{fontSize:11,textTransform:"uppercase",letterSpacing:"0.15em",color:T.tx3,fontWeight:600}}>📝 Notes</div>
+      </div>
+
+      {notes.length===0&&(
         <div style={{textAlign:"center",padding:"60px 20px",color:T.tx4,fontSize:14}}>
           <div style={{fontSize:48,marginBottom:16}}>📝</div>
           <div style={{fontWeight:700,color:T.tx3,marginBottom:8}}>No notes yet</div>
+          <div style={{fontSize:12}}>Tap + to create one</div>
         </div>
       )}
 
       <div style={{display:"grid",gridTemplateColumns:mob?"1fr":"1fr 1fr",gap:12}}>
         {sorted.map(n=>{
-          const isExp=expired(n.expires_at);
           const doneCount=(n.items||[]).filter(i=>i.done).length;
           const totalCount=(n.items||[]).length;
           return(
-            <div key={n.id} style={{background:T.bg2,border:`2px solid ${isExp?"#E63946":T.bd}`,borderRadius:10,padding:14,opacity:isExp?0.6:1}}>
+            <div key={n.id} style={{background:T.bg2,border:`2px solid ${T.bd}`,borderRadius:10,padding:14,position:"relative"}}>
               <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:8,marginBottom:6}}>
-                <div style={{fontSize:14,fontWeight:800,color:T.tx,wordBreak:"break-word",flex:1}}>{n.title||"(untitled)"}</div>
+                <div onClick={()=>openEdit(n)} style={{fontSize:14,fontWeight:800,color:T.tx,wordBreak:"break-word",flex:1,cursor:"pointer"}}>{n.title||"(untitled)"}</div>
                 <button onClick={()=>del(n.id)} style={{border:"none",background:"none",cursor:"pointer",color:"#E63946",fontSize:14,padding:0,flexShrink:0}}>✕</button>
               </div>
-              {n.expires_at&&(
-                <div style={{fontSize:10,fontWeight:700,color:isExp?"#E63946":T.tx3,marginBottom:6,textTransform:"uppercase",letterSpacing:"0.06em"}}>
-                  {isExp?"⏰ Expired":"⏳"} {n.expires_at}
-                </div>
-              )}
               {n.type==="text"?(
                 <div onClick={()=>openEdit(n)} style={{fontSize:13,color:T.tx2,whiteSpace:"pre-wrap",wordBreak:"break-word",lineHeight:1.5,maxHeight:160,overflow:"hidden",cursor:"pointer"}}>{n.content||"(empty)"}</div>
               ):(
@@ -864,17 +863,22 @@ function NotesPage({notes,setNotes}){
                   {totalCount>0&&<div style={{fontSize:10,color:T.tx3,marginTop:6}}>{doneCount}/{totalCount} done</div>}
                 </div>
               )}
-              <div style={{marginTop:10,textAlign:"right"}}>
-                <button onClick={()=>openEdit(n)} style={{border:"none",background:"none",cursor:"pointer",fontSize:11,color:T.tx3,textDecoration:"underline",padding:0}}>edit</button>
-              </div>
             </div>
           );
         })}
       </div>
+
+      {/* FAB bottom-right */}
+      <button
+        onClick={()=>openNew("text")}
+        style={{position:"fixed",bottom:24,right:24,width:56,height:56,borderRadius:28,border:"none",background:T.btn,color:T.btnT,fontSize:28,fontWeight:300,cursor:"pointer",boxShadow:"0 4px 16px rgba(0,0,0,0.3)",display:"flex",alignItems:"center",justifyContent:"center",lineHeight:1,zIndex:1500}}
+        title="New note"
+      >
+        +
+      </button>
     </div>
   );
 }
-
 
 export default function App(){
   const[user,setUser]=useState(null);const[authLoading,setAuthLoading]=useState(true);
