@@ -184,11 +184,11 @@ function Sidebar({open,onClose,page,setPage,sessions,onLogout,isDark,onToggleThe
   const T=useT();
    const items=[
   {key:PAGES.HABITS,label:"Habits",icon:"🔥",ok:dailyStatus.habitsOk},
+  {key:PAGES.NOTES,label:"Notes",icon:"📝",ok:true},
   {key:PAGES.GYM,label:"Gym",icon:"🏋️",ok:dailyStatus.gymOk},
   {key:PAGES.SPENDING,label:"Spending",icon:"💸",ok:dailyStatus.spendingOk},
   {key:PAGES.REFLECTION,label:"Reflect",icon:"💭",ok:dailyStatus.reflectOk},
   {key:PAGES.SLEEP,label:"Sleep",icon:"🌙",ok:dailyStatus.sleepOk},
-  {key:PAGES.NOTES,label:"Notes",icon:"📝",ok:true},
   {key:PAGES.GOALS,label:"Goals",icon:"🎯",ok:dailyStatus.goalsOk},
 ];
   const now=nowIST();const ys=String(now.getFullYear());const mn=now.toLocaleDateString("en-US",{month:"short"});
@@ -255,6 +255,20 @@ async function exportToExcel(sessions,reflections){const XLSX=await import("xlsx
   const allTags=[...new Set(sessions.map(s=>s.tag))].sort();
   const goal=goals.find(g=>g.id===selId);
   const addGoal=async()=>{if(!nName.trim()||!nTag||!nHrs||!nStartDate||!nDate)return;const sv=await insertGoal(nName.trim(),nTag,parseFloat(nHrs),nStartDate,nDate);if(sv){setGoals(p=>[...p,sv]);setSelId(sv.id);}setShowAdd(false);setNName("");setNTag("");setNHrs("");setNStartDate(todayStr());setNDate("");};
+  const[logTag,setLogTag]=useState("");
+const[logMins,setLogMins]=useState("");
+const todayMins=sessions.filter(s=>s.date===todayStr()).reduce((a,s)=>a+s.duration,0);
+const logSession=async()=>{
+  const mins=parseInt(logMins);
+  if(!logTag.trim()||isNaN(mins)||mins<=0)return;
+  const ns={tag:logTag.trim(),duration:mins,date:todayStr(),ts:Date.now()};
+  const sv=await insertSession(ns);
+  if(sv){
+    setSessions(p=>[...p,{id:sv.id,tag:sv.tag,duration:sv.duration,date:sv.date,ts:Number(sv.ts)}]);
+    setLogTag("");setLogMins("");
+  }
+};
+  
   let S=null;
   if(goal){
     const ts=sessions.filter(s=>s.tag===goal.tag);const totalMins=ts.reduce((a,s)=>a+s.duration,0);const totalH=totalMins/60;
@@ -287,6 +301,12 @@ async function exportToExcel(sessions,reflections){const XLSX=await import("xlsx
           {goals.length>0&&(<select value={selId} onChange={e=>{setSelId(e.target.value);setProjMins({});}} style={{...selStyle,maxWidth:mob?180:260}}>{goals.map(g=>(<option key={g.id} value={g.id}>{g.name}</option>))}</select>)}
           <button onClick={()=>setShowAdd(!showAdd)} style={{padding:"10px 18px",border:`2px solid ${T.bd3}`,background:showAdd?"transparent":T.btn,color:showAdd?T.tx:T.btnT,fontSize:12,fontFamily:F,fontWeight:700,cursor:"pointer"}}>{showAdd?"✕":"+ New"}</button>
         </div>
+      </div>
+            <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",marginBottom:20,padding:"12px 14px",background:T.bg2,border:`1px solid ${T.bd}`,borderRadius:10}}>
+        <input value={logTag} onChange={e=>setLogTag(e.target.value)} placeholder="Study tag" style={{...iStyle,flex:1,minWidth:120,padding:"8px 12px",fontSize:13}} onKeyDown={e=>e.key==="Enter"&&logSession()}/>
+        <input value={logMins} onChange={e=>setLogMins(e.target.value)} placeholder="mins" type="number" style={{...iStyle,width:80,padding:"8px 10px",fontSize:13}} onKeyDown={e=>e.key==="Enter"&&logSession()}/>
+        <button onClick={logSession} style={{padding:"9px 18px",border:`2px solid ${T.bd3}`,background:T.btn,color:T.btnT,fontSize:13,fontWeight:700,cursor:"pointer",borderRadius:6}}>+ Log</button>
+        {todayMins>0&&<span style={{fontSize:12,fontWeight:700,color:todayMins>=120?"#2A9D8F":"#E63946"}}>{formatHM(todayMins)} {todayMins>=120?"🔥":""}</span>}
       </div>
       {showAdd&&(<div style={{background:T.bg2,borderRadius:10,padding:mob?16:20,marginBottom:24,border:`1px solid ${T.bd}`}}><div style={{fontSize:11,textTransform:"uppercase",letterSpacing:"0.12em",color:T.tx3,fontWeight:600,marginBottom:14}}>Create New Goal</div><div style={{display:"grid",gridTemplateColumns:mob?"1fr":"1fr 1fr",gap:10,marginBottom:12}}><input value={nName} onChange={e=>setNName(e.target.value)} placeholder="Goal name" style={iStyle}/><select value={nTag} onChange={e=>setNTag(e.target.value)} style={selStyle}><option value="">Select tag...</option>{allTags.map(t=>(<option key={t} value={t}>{t}</option>))}</select><input value={nHrs} onChange={e=>setNHrs(e.target.value)} placeholder="Target hours" type="number" style={iStyle}/><div style={{display:"flex",gap:8}}><div style={{flex:1,display:"flex",flexDirection:"column",gap:4}}><label style={{fontSize:10,color:T.tx3,fontWeight:600}}>START</label><input value={nStartDate} onChange={e=>setNStartDate(e.target.value)} type="date" style={iStyle}/></div><div style={{flex:1,display:"flex",flexDirection:"column",gap:4}}><label style={{fontSize:10,color:T.tx3,fontWeight:600}}>END</label><input value={nDate} onChange={e=>setNDate(e.target.value)} type="date" style={iStyle}/></div></div></div><button onClick={addGoal} style={{padding:"10px 28px",border:`2px solid ${T.bd3}`,background:T.btn,color:T.btnT,fontSize:12,fontFamily:F,fontWeight:700,cursor:"pointer",letterSpacing:"0.06em",textTransform:"uppercase"}}>Create Goal</button></div>)}
       {goals.length===0&&!showAdd&&(<div style={{textAlign:"center",padding:"40px 20px",color:T.tx4,fontSize:14}}><div style={{fontSize:48,marginBottom:16}}>🎯</div><div style={{fontWeight:700,color:T.tx3,marginBottom:8}}>No goals yet</div></div>)}
