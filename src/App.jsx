@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback, createContext, useContext } f
 import * as Tone from "tone";
 import { supabase } from "./supabaseClient";
 
-const PAGES = { GOALS: "goals", HABITS: "habits", GYM: "gym", SPENDING: "spending", REFLECTION: "reflection", SLEEP: "sleep" };
+const PAGES = { GOALS: "goals", HABITS: "habits", GYM: "gym", SPENDING: "spending", REFLECTION: "reflection", SLEEP: "sleep", NOTES: "notes" };
 
 const ThemeContext = createContext();
 const L = {
@@ -89,6 +89,48 @@ async function loadGymLogs(){
 }
 async function insertGymLog(date,exercises,note){const{data:{user}}=await supabase.auth.getUser();if(!user)return null;const{data,error}=await supabase.from("gym_logs").insert({user_id:user.id,date,exercises:JSON.stringify(exercises),note}).select().single();if(error)return null;return{...data,exercises:JSON.parse(data.exercises||"[]")};}
 async function updateGymLog(id,exercises,note){const{data,error}=await supabase.from("gym_logs").update({exercises:JSON.stringify(exercises),note}).eq("id",id).select().single();if(error)return null;return{...data,exercises:JSON.parse(data.exercises||"[]")};}
+async function loadNotes(){
+  const{data,error}=await supabase.from("notes").select("*").order("created_at",{ascending:false});
+  if(error)return[];
+  return data.map(r=>({
+    id:r.id,
+    title:r.title||"",
+    content:r.content||"",
+    items:Array.isArray(r.items)?r.items:(r.items?JSON.parse(r.items):[]),
+    type:r.type||"text",
+    expires_at:r.expires_at||null,
+    created_at:r.created_at,
+    updated_at:r.updated_at,
+  }));
+}
+async function insertNote(note){
+  const{data:{user}}=await supabase.auth.getUser();if(!user)return null;
+  const{data,error}=await supabase.from("notes").insert({
+    user_id:user.id,
+    title:note.title,
+    content:note.content,
+    items:note.items||[],
+    type:note.type||"text",
+    expires_at:note.expires_at||null,
+  }).select().single();
+  if(error){console.error(error);return null;}
+  return data;
+}
+async function updateNote(id,patch){
+  const{data,error}=await supabase.from("notes").update({
+    title:patch.title,
+    content:patch.content,
+    items:patch.items||[],
+    type:patch.type,
+    expires_at:patch.expires_at||null,
+    updated_at:new Date().toISOString(),
+  }).eq("id",id).select().single();
+  if(error){console.error(error);return null;}
+  return data;
+}
+async function deleteNoteDB(id){
+  await supabase.from("notes").delete().eq("id",id);
+}
 
 function toIST(d){return new Date(d.toLocaleString("en-US",{timeZone:"Asia/Kolkata"}));}
 function dateToStr(d){return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;}
@@ -140,12 +182,13 @@ function TopNavBar({sessions,streak,onMenuClick}){
 
 function Sidebar({open,onClose,page,setPage,sessions,onLogout,isDark,onToggleTheme,dailyStatus}){
   const T=useT();
-  const items=[
+   const items=[
   {key:PAGES.HABITS,label:"Habits",icon:"🔥",ok:dailyStatus.habitsOk},
   {key:PAGES.GYM,label:"Gym",icon:"🏋️",ok:dailyStatus.gymOk},
   {key:PAGES.SPENDING,label:"Spending",icon:"💸",ok:dailyStatus.spendingOk},
   {key:PAGES.REFLECTION,label:"Reflect",icon:"💭",ok:dailyStatus.reflectOk},
   {key:PAGES.SLEEP,label:"Sleep",icon:"🌙",ok:dailyStatus.sleepOk},
+  {key:PAGES.NOTES,label:"Notes",icon:"📝",ok:true},
   {key:PAGES.GOALS,label:"Goals",icon:"🎯",ok:dailyStatus.goalsOk},
 ];
   const now=nowIST();const ys=String(now.getFullYear());const mn=now.toLocaleDateString("en-US",{month:"short"});
@@ -686,6 +729,153 @@ function SleepPage({sleepLogs,setSleepLogs}){
   );
 }
 
+function NotesPage({notes,setNotes}){
+  const T=useT();const w=useWindowWidth();const mob=w<480;
+  const[editing,setEditing]=useState(null);
+  const[title,setTitle]=useState("");
+  const[content,setContent]=useState("");
+  const[items,setItems]=useState([]);
+  const[type,setType]=useState("text");
+  const[expires,setExpires]=useState("");
+  const[newItem,setNewItem]=useState("");
+
+  const today=todayStr();
+  const expired=date=>date&&date<today;
+
+  const openNew=()=>{setEditing("new");setTitle("");setContent("");setItems([]);setType("text");setExpires("");setNewItem("");};
+  const openEdit=(n)=>{setEditing(n.id);setTitle(n.title||"");setContent(n.content||"");setItems(n.items||[]);setType(n.type||"text");setExpires(n.expires_at||"");setNewItem("");};
+  const close=()=>setEditing(null);
+
+  const save=async()=>{
+    if(!title.trim()&&!content.trim()&&items.length===0)return;
+    const payload={title:title.trim(),content,items:items.filter(i=>i.text.trim()),type,expires_at:expires||null};
+    if(editing==="new"){
+      const sv=await insertNote(payload);
+      if(sv)setNotes(p=>[{...sv,items:sv.items||[]},...p]);
+    }else{
+      const sv=await updateNote(editing,payload);
+      if(sv)setNotes(p=>p.map(n=>n.id===editing?{...n,...sv,items:sv.items||[]}:n));
+    }
+    close();
+  };
+  const del=async(id)=>{
+    if(!confirm("Delete this note?"))return;
+    await deleteNoteDB(id);
+    setNotes(p=>p.filter(n=>n.id!==id));
+    if(editing===id)close();
+  };
+  const addItem=()=>{if(!newItem.trim())return;setItems(p=>[...p,{text:newItem.trim(),done:false}]);setNewItem("");};
+  const toggleItem=(idx)=>setItems(p=>p.map((it,i)=>i===idx?{...it,done:!it.done}:it));
+  const removeItem=(idx)=>setItems(p=>p.filter((_,i)=>i!==idx));
+  const toggleCardItem=async(n,idx)=>{
+    const newItems=n.items.map((it,i)=>i===idx?{...it,done:!it.done}:it);
+    const sv=await updateNote(n.id,{...n,items:newItems});
+    if(sv)setNotes(p=>p.map(x=>x.id===n.id?{...x,items:newItems}:x));
+  };
+
+  const sorted=[...notes].sort((a,b)=>{
+    const aExp=expired(a.expires_at)?1:0,bExp=expired(b.expires_at)?1:0;
+    if(aExp!==bExp)return aExp-bExp;
+    if(a.expires_at&&b.expires_at&&a.expires_at!==b.expires_at)return a.expires_at.localeCompare(b.expires_at);
+    return(b.created_at||"").localeCompare(a.created_at||"");
+  });
+
+  const iStyle={border:`2px solid ${T.bd3}`,padding:"8px 12px",fontSize:13,fontFamily:F,background:"transparent",outline:"none",boxSizing:"border-box",color:T.tx,borderRadius:6};
+
+  return(
+    <div style={{fontFamily:F}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20,gap:10,flexWrap:"wrap"}}>
+        <div style={{fontSize:11,textTransform:"uppercase",letterSpacing:"0.15em",color:T.tx3,fontWeight:600}}>📝 Notes</div>
+        {editing===null&&<button onClick={openNew} style={{padding:"10px 18px",border:`2px solid ${T.bd3}`,background:T.btn,color:T.btnT,fontSize:12,fontFamily:F,fontWeight:700,cursor:"pointer"}}>+ New Note</button>}
+      </div>
+
+      {editing!==null&&(
+        <div style={{background:T.bg2,borderRadius:10,padding:mob?14:20,marginBottom:24,border:`1px solid ${T.bd}`}}>
+          <div style={{display:"flex",gap:8,marginBottom:12}}>
+            {["text","checklist"].map(t=>(
+              <button key={t} onClick={()=>setType(t)} style={{padding:"6px 14px",border:`2px solid ${type===t?T.bd3:T.bd2}`,background:type===t?T.btn:"transparent",color:type===t?T.btnT:T.tx3,fontFamily:F,fontSize:12,fontWeight:700,cursor:"pointer",borderRadius:6}}>
+                {t==="text"?"📄 Text":"☑ Checklist"}
+              </button>
+            ))}
+          </div>
+          <input value={title} onChange={e=>setTitle(e.target.value)} placeholder="Title" style={{...iStyle,width:"100%",marginBottom:10,fontSize:15,fontWeight:700}}/>
+          {type==="text"?(
+            <textarea value={content} onChange={e=>setContent(e.target.value)} placeholder="Write something..." rows={6} style={{...iStyle,width:"100%",resize:"vertical",marginBottom:10,lineHeight:1.5}}/>
+          ):(
+            <div style={{marginBottom:10}}>
+              {items.map((it,i)=>(
+                <div key={i} style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
+                  <input type="checkbox" checked={it.done} onChange={()=>toggleItem(i)} style={{width:16,height:16,cursor:"pointer"}}/>
+                  <span style={{flex:1,fontSize:14,textDecoration:it.done?"line-through":"none",color:it.done?T.tx3:T.tx}}>{it.text}</span>
+                  <button onClick={()=>removeItem(i)} style={{border:"none",background:"none",cursor:"pointer",color:T.tx4,fontSize:14,padding:0}}>✕</button>
+                </div>
+              ))}
+              <div style={{display:"flex",gap:6,marginTop:8}}>
+                <input value={newItem} onChange={e=>setNewItem(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addItem()} placeholder="Add item..." style={{...iStyle,flex:1}}/>
+                <button onClick={addItem} style={{padding:"6px 14px",border:`2px solid ${T.bd3}`,background:T.btn,color:T.btnT,fontSize:12,fontWeight:700,cursor:"pointer",borderRadius:6}}>+</button>
+              </div>
+            </div>
+          )}
+          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12,flexWrap:"wrap"}}>
+            <label style={{fontSize:11,color:T.tx3,fontWeight:600}}>EXPIRES:</label>
+            <input type="date" value={expires} onChange={e=>setExpires(e.target.value)} style={{...iStyle,width:160}}/>
+            {expires&&<button onClick={()=>setExpires("")} style={{border:"none",background:"none",cursor:"pointer",fontSize:11,color:T.tx3,textDecoration:"underline",padding:0}}>clear</button>}
+          </div>
+          <div style={{display:"flex",gap:8}}>
+            <button onClick={save} style={{padding:"9px 20px",border:`2px solid ${T.bd3}`,background:T.btn,color:T.btnT,fontSize:12,fontFamily:F,fontWeight:700,cursor:"pointer",borderRadius:6}}>Save</button>
+            <button onClick={close} style={{padding:"9px 16px",border:`2px solid ${T.bd2}`,background:"transparent",color:T.tx3,fontSize:12,fontFamily:F,cursor:"pointer",borderRadius:6}}>Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {notes.length===0&&editing===null&&(
+        <div style={{textAlign:"center",padding:"60px 20px",color:T.tx4,fontSize:14}}>
+          <div style={{fontSize:48,marginBottom:16}}>📝</div>
+          <div style={{fontWeight:700,color:T.tx3,marginBottom:8}}>No notes yet</div>
+        </div>
+      )}
+
+      <div style={{display:"grid",gridTemplateColumns:mob?"1fr":"1fr 1fr",gap:12}}>
+        {sorted.map(n=>{
+          const isExp=expired(n.expires_at);
+          const doneCount=(n.items||[]).filter(i=>i.done).length;
+          const totalCount=(n.items||[]).length;
+          return(
+            <div key={n.id} style={{background:T.bg2,border:`2px solid ${isExp?"#E63946":T.bd}`,borderRadius:10,padding:14,opacity:isExp?0.6:1}}>
+              <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:8,marginBottom:6}}>
+                <div style={{fontSize:14,fontWeight:800,color:T.tx,wordBreak:"break-word",flex:1}}>{n.title||"(untitled)"}</div>
+                <button onClick={()=>del(n.id)} style={{border:"none",background:"none",cursor:"pointer",color:"#E63946",fontSize:14,padding:0,flexShrink:0}}>✕</button>
+              </div>
+              {n.expires_at&&(
+                <div style={{fontSize:10,fontWeight:700,color:isExp?"#E63946":T.tx3,marginBottom:6,textTransform:"uppercase",letterSpacing:"0.06em"}}>
+                  {isExp?"⏰ Expired":"⏳"} {n.expires_at}
+                </div>
+              )}
+              {n.type==="text"?(
+                <div onClick={()=>openEdit(n)} style={{fontSize:13,color:T.tx2,whiteSpace:"pre-wrap",wordBreak:"break-word",lineHeight:1.5,maxHeight:160,overflow:"hidden",cursor:"pointer"}}>{n.content||"(empty)"}</div>
+              ):(
+                <div>
+                  {n.items.map((it,i)=>(
+                    <div key={i} onClick={()=>toggleCardItem(n,i)} style={{display:"flex",alignItems:"center",gap:6,marginBottom:3,cursor:"pointer",fontSize:13}}>
+                      <span style={{width:14,height:14,border:`1.5px solid ${it.done?"#2A9D8F":T.tx4}`,background:it.done?"#2A9D8F":"transparent",borderRadius:3,display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,color:"#fff",flexShrink:0}}>{it.done&&"✓"}</span>
+                      <span style={{textDecoration:it.done?"line-through":"none",color:it.done?T.tx3:T.tx}}>{it.text}</span>
+                    </div>
+                  ))}
+                  {totalCount>0&&<div style={{fontSize:10,color:T.tx3,marginTop:6}}>{doneCount}/{totalCount} done</div>}
+                </div>
+              )}
+              <div style={{marginTop:10,textAlign:"right"}}>
+                <button onClick={()=>openEdit(n)} style={{border:"none",background:"none",cursor:"pointer",fontSize:11,color:T.tx3,textDecoration:"underline",padding:0}}>edit</button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+
 export default function App(){
   const[user,setUser]=useState(null);const[authLoading,setAuthLoading]=useState(true);
   const[page,setPage]=useState(PAGES.HABITS);
@@ -693,6 +883,7 @@ export default function App(){
   const[goals,setGoals]=useState([]);const[habits,setHabits]=useState([]);const[habitLogs,setHabitLogs]=useState([]);
   const[reflections,setReflections]=useState({});
   const[gymLogs,setGymLogs]=useState([]);
+  const[notes,setNotes]=useState([]);
   const[loaded,setLoaded]=useState(false);const[sidebarOpen,setSidebarOpen]=useState(false);
   const[isDark,setIsDark]=useState(()=>localStorage.getItem("fm_theme")==="dark");
   const toggleTheme=()=>{setIsDark(p=>{const n=!p;localStorage.setItem("fm_theme",n?"dark":"light");return n;});};
@@ -701,12 +892,12 @@ export default function App(){
   if(typeof document!=="undefined"){document.body.style.background=(localStorage.getItem("fm_theme")==="dark"?"#000":"#fff");document.documentElement.style.background=(localStorage.getItem("fm_theme")==="dark"?"#000":"#fff");}
   useEffect(()=>{supabase.auth.getSession().then(({data:{session}})=>{setUser(session?.user??null);setAuthLoading(false);});const{data:{subscription}}=supabase.auth.onAuthStateChange((_e,session)=>{setUser(session?.user??null);});return()=>subscription.unsubscribe();},[]);
   useEffect(()=>{
-     if(!user){setSessions([]);setSleepLogs([]);setGoals([]);setHabits([]);setHabitLogs([]);setGymLogs([]);setLoaded(false);return;}
+      if(!user){setSessions([]);setSleepLogs([]);setGoals([]);setHabits([]);setHabitLogs([]);setGymLogs([]);setNotes([]);setLoaded(false);return;}
     setLoaded(false);
-     Promise.all([loadSessions(),loadSleepLogs(),loadGoals(),loadHabits(),loadHabitLogs(),loadReflections(),loadGymLogs()])
-      .then(([s,sl,g,h,hl,ref,gl])=>{setSessions(s);setSleepLogs(sl);setGoals(g);setHabits(h);setHabitLogs(hl);setReflections(ref);setGymLogs(gl);setLoaded(true);});
+      Promise.all([loadSessions(),loadSleepLogs(),loadGoals(),loadHabits(),loadHabitLogs(),loadReflections(),loadGymLogs(),loadNotes()])
+      .then(([s,sl,g,h,hl,ref,gl,nt])=>{setSessions(s);setSleepLogs(sl);setGoals(g);setHabits(h);setHabitLogs(hl);setReflections(ref);setGymLogs(gl);setNotes(nt);setLoaded(true);});
   },[user]);
-   const handleLogout=async()=>{await supabase.auth.signOut();setUser(null);setSessions([]);setSleepLogs([]);setGoals([]);setHabits([]);setHabitLogs([]);setGymLogs([]);setLoaded(false);setSidebarOpen(false);};
+    const handleLogout=async()=>{await supabase.auth.signOut();setUser(null);setSessions([]);setSleepLogs([]);setGoals([]);setHabits([]);setHabitLogs([]);setGymLogs([]);setNotes([]);setLoaded(false);setSidebarOpen(false);};
    const streak=(()=>{
   if(habits.length===0)return 0;
   const doneByDate={};
@@ -729,7 +920,7 @@ export default function App(){
   return s;
 })(); 
    const dailyStatus=useDailyStatus(sessions,habits,habitLogs,reflections,sleepLogs,gymLogs);
-  const getMaxWidth=()=>{if(page===PAGES.GOALS||page===PAGES.HABITS)return w<480?"100%":640;return w<480?"100%":540;};
+   const getMaxWidth=()=>{if(page===PAGES.GOALS||page===PAGES.HABITS||page===PAGES.NOTES)return w<480?"100%":640;return w<480?"100%":540;};
   const fontLink=<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>;
   if(authLoading)return(<ThemeContext.Provider value={theme}><div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100vh",fontFamily:F,fontSize:14,color:theme.tx3,background:theme.bg}}>{fontLink}Loading...</div></ThemeContext.Provider>);
   if(!user)return(<ThemeContext.Provider value={theme}>{fontLink}<AuthPage/></ThemeContext.Provider>);
@@ -746,6 +937,7 @@ export default function App(){
         {page===PAGES.SPENDING&&<div style={{paddingTop:16}}><SpendingPage/></div>}
         {page===PAGES.REFLECTION&&<div style={{paddingTop:16}}><ReflectionPage sessions={sessions}/></div>}
         {page===PAGES.SLEEP&&<div style={{paddingTop:16}}><SleepPage sleepLogs={sleepLogs} setSleepLogs={setSleepLogs}/></div>}
+        {page===PAGES.NOTES&&<div style={{paddingTop:16}}><NotesPage notes={notes} setNotes={setNotes}/></div>}
       </div>
     </ThemeContext.Provider>
   );
